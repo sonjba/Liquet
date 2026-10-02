@@ -2,7 +2,7 @@
 
 **AI-assisted monthly bank reconciliation: rules match, an agent explains the rest, a person approves.**
 
-*Liquet — Latin for "it is clear."*
+*Liquet - Latin for "it is clear."*
 
 ---
 
