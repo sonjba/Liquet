@@ -8,6 +8,7 @@ JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 HEADER_ROW = "date,description,reference,paid_in,paid_out,balance\n"
 CASES = Path(__file__).parent / "fixtures" / "cases"
 
+# NORMAL CASES (assertions check that the data is read correctly) assert
 def test_june_header_is_read_correctly():
     header = read_statement.read_header(JUNE / "statement_header.json")
     assert header["account_id"] == "ACC-KRW-CASH-01"
@@ -28,6 +29,8 @@ def test_june_lines_are_read_correctly():
     assert lines[0]["paid_out"] is None
     assert lines[0]["balance"] == Decimal("275000.00")
 
+
+# BOUNDARY CASES (assertions check that the data is rejected correctly) tmp_path
 def test_statement_with_no_transactions_gives_empty_list(tmp_path):
     csv_file = tmp_path / "statement.csv"
     csv_file.write_text(HEADER_ROW, encoding="utf-8")
@@ -82,6 +85,8 @@ def test_nan_amount_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="not a finite number"):
         read_statement.read_lines(csv_file)
 
+
+# SILENT WRONGS (assertions check that the data is rejected correctly) pytest.raises
 def test_cancelling_errors_fool_totals_but_not_running_balance():
     case = "check_fail_running_balance_errors_cancel_in_totals"
     header = read_statement.read_header(CASES / "checks" / f"{case}.json")
@@ -106,3 +111,12 @@ def test_wrong_closing_balance_fails_totals_only():
     running_ok, running_message = read_statement.check_running_balance(header, lines)
     assert running_ok, running_message
 
+# BAD INPUTS (assertions check that the data is rejected correctly) pytest.raises + parametrize
+@pytest.mark.parametrize("file_name", [
+    "error_negative_paid_out.csv",
+    "error_paid_in_nan.csv",
+    "error_letters_in_amount.csv",
+])
+def test_bad_lines_file_is_rejected(file_name):
+    with pytest.raises(ValueError):
+        read_statement.read_lines(CASES / "lines" / file_name)
