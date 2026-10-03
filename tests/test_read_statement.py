@@ -10,6 +10,9 @@ HEADER_ROW = "date,description,reference,paid_in,paid_out,balance\n"
 CASES = Path(__file__).parent / "fixtures" / "cases"
 
 # NORMAL CASES (assertions check that the data is read correctly) assert
+
+# Regression: list(reader) once used up the reader, so values stayed text;
+# a missing enumerate unpacking broke every line; Decimal("") failed on empty cells.
 def test_june_header_is_read_correctly():
     header = read_statement.read_header(JUNE / "statement_header.json")
     assert header["account_id"] == "ACC-KRW-CASH-01"
@@ -66,6 +69,7 @@ def test_statement_with_one_transaction(tmp_path):
     assert lines[0]["amount"] == Decimal("100.00")
     assert lines[0]["balance"] == Decimal("1100.00")
 
+# Regression: a negative paid_out was silently flipped into money in.
 def test_negative_paid_out_is_rejected(tmp_path):
     csv_file = tmp_path / "statement.csv"
     csv_file.write_text(
@@ -76,6 +80,7 @@ def test_negative_paid_out_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="must not be negative"):
         read_statement.read_lines(csv_file)
 
+# Regression: Decimal accepts "NaN"; the error message was first put in the wrong branch.
 def test_nan_amount_is_rejected(tmp_path):
     csv_file = tmp_path / "statement.csv"
     csv_file.write_text(
@@ -142,7 +147,7 @@ def test_bad_lines_file_is_rejected(file_name, expected):
     with pytest.raises(ValueError, match=re.escape(expected)):
         read_statement.read_lines(CASES / "lines" / file_name)
 
-
+# Regression: Excel's invisible BOM broke the first column name (see ok_bom_from_excel.csv).
 @pytest.mark.parametrize("file_name", [
     "ok_negative_balance_overdrawn.csv",
     "ok_header_only_no_transactions.csv",
@@ -153,3 +158,50 @@ def test_bad_lines_file_is_rejected(file_name, expected):
 ])
 def test_valid_lines_file_is_read(file_name):
     read_statement.read_lines(CASES / "lines" / file_name)
+
+
+# REGRESSION TESTS (assertions check that the data is rejected correctly)
+@pytest.mark.parametrize("file_name, expected", [
+    ("error_header_missing_closing_balance.json", "Header is missing fields: ['closing_balance']"),
+    ("error_header_missing_account_id.json", "Header is missing fields: ['account_id']"),
+    ("error_header_opening_balance_not_a_number.json", "Header opening_balance: not a number"),
+    ("error_header_opening_balance_empty.json", "Header opening_balance: is empty"),
+    ("error_header_closing_balance_nan.json", "Header closing_balance: not a finite number"),
+    ("error_header_period_end_wrong_format.json", "Header period_end: invalid date"),
+    ("error_header_period_reversed.json", "period_start is after period_end"),
+    ("error_header_currency_eur.json", "only GBP is supported"),
+    ("error_header_invalid_json.json", "not valid JSON"),
+])
+def test_bad_header_file_is_rejected(file_name, expected):
+    with pytest.raises(ValueError, match=re.escape(expected)):
+        read_statement.read_header(CASES / "headers" / file_name)
+
+
+def test_valid_header_file_is_read():
+    header = read_statement.read_header(CASES / "headers" / "ok_header.json")
+    assert header["opening_balance"] == Decimal("1000.00")
+    assert header["closing_balance"] == Decimal("1224.50")
+
+
+def test_lines_on_first_and_last_day_of_period_pass_dates_check(tmp_path):
+    header = read_statement.read_header(JUNE / "statement_header.json")
+    csv_file = tmp_path / "statement.csv"
+    csv_file.write_text(
+        HEADER_ROW
+        + "2026-06-01,FIRST DAY OF PERIOD,REF-1,100.00,,250100.00\n"
+        + "2026-06-30,LAST DAY OF PERIOD,REF-2,,50.00,250050.00\n",
+        encoding="utf-8",
+    )
+    lines = read_statement.read_lines(csv_file)
+
+    dates_ok, dates_message = read_statement.check_dates(header, lines)
+    assert dates_ok, dates_message
+
+
+def test_line_after_period_end_fails_dates_check():
+    case = "check_fail_dates_outside_period"
+    header = read_statement.read_header(CASES / "checks" / f"{case}.json")
+    lines = read_statement.read_lines(CASES / "checks" / f"{case}.csv")
+
+    dates_ok, dates_message = read_statement.check_dates(header, lines)
+    assert not dates_ok
