@@ -168,7 +168,7 @@ The system does not require the agent to always have an answer.
 
 ---
 
-## Design Principle
+## Design Principle ()
 
 Liquet does not replace the person responsible for the reconciliation.
 
@@ -181,3 +181,30 @@ It separates three things:
 **The person decides when the evidence is insufficient.**
 
 > **The system proposes. The evidence explains. The person approves.**
+
+
+## Status
+
+Early development. Built so far:
+- Statement reader (CSV + header): type conversion, input validation,
+  and self-checks (totals, running balance, dates).
+- Tests for the reader.
+
+Planned: cash-book loading, matching rules, the graph layer, the agent, and evaluation.
+
+## Data
+
+All data in this repository is synthetic. No real company, client or bank data is used.
+
+- The firm (Kestrel Row Wealth Ltd), its custodian (Northgate Custody Bank),
+  clients and securities are invented. Any resemblance to real firms or people
+  is coincidental. See `docs/firm-profile.md`.
+- The firm profile, the June statement (`tests/fixtures/2026-06/`) and the
+  test cases (`tests/fixtures/cases/`) were generated with help from an AI
+  assistant (Claude) and checked by me.
+
+## AI assistance
+
+I used Claude during development for design discussions, code review and some
+code suggestions. I reviewed and tested all code, and I'm responsible for the
+design decisions and the final result.
