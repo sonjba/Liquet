@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 import pytest
 import read_statement
+import re
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 HEADER_ROW = "date,description,reference,paid_in,paid_out,balance\n"
@@ -112,11 +113,43 @@ def test_wrong_closing_balance_fails_totals_only():
     assert running_ok, running_message
 
 # BAD INPUTS (assertions check that the data is rejected correctly) pytest.raises + parametrize
-@pytest.mark.parametrize("file_name", [
-    "error_negative_paid_out.csv",
-    "error_paid_in_nan.csv",
-    "error_letters_in_amount.csv",
+@pytest.mark.parametrize("file_name, expected", [
+    # amounts
+    ("error_negative_paid_out.csv", "Line 3: paid_out: must not be negative"),
+    ("error_negative_paid_in.csv", "Line 3: paid_in: must not be negative"),
+    ("error_paid_in_nan.csv", "Line 3: paid_in: not a finite number"),
+    ("error_paid_in_infinity.csv", "Line 3: paid_in: not a finite number"),
+    ("error_three_decimals.csv", "Line 3: paid_in: more than two decimal places"),
+    ("error_thousands_separator.csv", "Line 3: paid_in: not a number"),
+    ("error_european_decimal_comma.csv", "Line 3: paid_in: not a number"),
+    ("error_pound_sign_in_amount.csv", "Line 3: paid_in: not a number"),
+    ("error_letters_in_amount.csv", "Line 3: paid_in: not a number"),
+    # dates
+    ("error_date_dd_mm_yyyy.csv", "Line 3: invalid date"),
+    ("error_date_empty_commas_only.csv", "Line 3: invalid date"),
+    # paid_in / paid_out / balance rules
+    ("error_both_paid_in_and_out.csv", "Line 3: needs exactly one of paid_in or paid_out"),
+    ("error_neither_paid_in_nor_out.csv", "Line 3: needs exactly one of paid_in or paid_out"),
+    ("error_balance_empty.csv", "Line 3: balance is empty"),
+    # columns and file shape
+    ("error_column_misspelled_with_data.csv", "Missing columns: ['paid_out']"),
+    ("error_column_misspelled_no_data.csv", "Missing columns: ['paid_out']"),
+    ("error_column_missing_balance.csv", "Missing columns: ['balance']"),
+    ("error_semicolon_separated.csv", "Missing columns"),
+    ("error_empty_file.csv", "Missing columns"),
 ])
-def test_bad_lines_file_is_rejected(file_name):
-    with pytest.raises(ValueError):
+def test_bad_lines_file_is_rejected(file_name, expected):
+    with pytest.raises(ValueError, match=re.escape(expected)):
         read_statement.read_lines(CASES / "lines" / file_name)
+
+
+@pytest.mark.parametrize("file_name", [
+    "ok_negative_balance_overdrawn.csv",
+    "ok_header_only_no_transactions.csv",
+    "ok_bom_from_excel.csv",
+    "ok_columns_in_different_order.csv",
+    "ok_extra_column_is_ignored.csv",
+    "ok_pound_sign_in_description.csv",
+])
+def test_valid_lines_file_is_read(file_name):
+    read_statement.read_lines(CASES / "lines" / file_name)
