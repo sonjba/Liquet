@@ -40,7 +40,7 @@ def parse_money(text: str, where: str, allow_negative: bool = False) -> Decimal 
     except InvalidOperation:
         raise ValueError(f"{where}: not a number: {text!r}")
     if not value.is_finite():
-        raise ValueError(f"{where}: not a valid amount: {text!r}")
+        raise ValueError(f"{where}: not a finite number (NaN or Infinity): {text!r}")
     if value.as_tuple().exponent < -2:
         raise ValueError(f"{where}: more than two decimal places: {text!r}")
     if value < 0 and not allow_negative:

@@ -1,11 +1,12 @@
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-
+import pytest
 import read_statement
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 HEADER_ROW = "date,description,reference,paid_in,paid_out,balance\n"
+CASES = Path(__file__).parent / "fixtures" / "cases"
 
 def test_june_header_is_read_correctly():
     header = read_statement.read_header(JUNE / "statement_header.json")
@@ -60,3 +61,48 @@ def test_statement_with_one_transaction(tmp_path):
     assert len(lines) == 1
     assert lines[0]["amount"] == Decimal("100.00")
     assert lines[0]["balance"] == Decimal("1100.00")
+
+def test_negative_paid_out_is_rejected(tmp_path):
+    csv_file = tmp_path / "statement.csv"
+    csv_file.write_text(
+        HEADER_ROW + "2026-06-01,CUSTODY FEE,NCB-FEE-0601,,-45.00,955.00\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="must not be negative"):
+        read_statement.read_lines(csv_file)
+
+def test_nan_amount_is_rejected(tmp_path):
+    csv_file = tmp_path / "statement.csv"
+    csv_file.write_text(
+        HEADER_ROW + "2026-06-01,SUBSCRIPTION CL-001,CL-001-SUB-0601,NaN,,1100.00\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="not a finite number"):
+        read_statement.read_lines(csv_file)
+
+def test_cancelling_errors_fool_totals_but_not_running_balance():
+    case = "check_fail_running_balance_errors_cancel_in_totals"
+    header = read_statement.read_header(CASES / "checks" / f"{case}.json")
+    lines = read_statement.read_lines(CASES / "checks" / f"{case}.csv")
+
+    totals_ok, totals_message = read_statement.check_totals(header, lines)
+    assert totals_ok, totals_message        # the trap: totals is fooled
+
+    running_ok, running_message = read_statement.check_running_balance(header, lines)
+    assert not running_ok                   # the catch
+    assert "Line 2" in running_message      # and it points at the right line
+
+def test_wrong_closing_balance_fails_totals_only():
+    header = read_statement.read_header(CASES / "checks" / "check_fail_totals_closing_balance_wrong.json")
+    lines = read_statement.read_lines(CASES / "checks" / "check_fail_totals_closing_balance_wrong.csv")
+
+    totals_ok, totals_message = read_statement.check_totals(header, lines)
+    assert not totals_ok
+    assert "1224.50" in totals_message   # what the lines add up to
+    assert "1224.00" in totals_message   # what the header claims
+
+    running_ok, running_message = read_statement.check_running_balance(header, lines)
+    assert running_ok, running_message
+
