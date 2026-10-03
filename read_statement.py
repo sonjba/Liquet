@@ -82,7 +82,7 @@ def read_header(header_path: Path) -> dict:
 
 def read_lines(lines_path: Path) -> list[dict]:
     lines = []
-    with open(lines_path, "r", encoding="utf-8", newline="") as lines_data:
+    with open(lines_path, "r", encoding="utf-8-sig", newline="") as lines_data:
         reader = csv.DictReader(lines_data)
         missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
         if missing:
