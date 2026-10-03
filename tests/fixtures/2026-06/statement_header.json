@@ -1,0 +1,9 @@
+{
+  "account_id": "ACC-KRW-CASH-01",
+  "custodian": "Northgate Custody Bank",
+  "currency": "GBP",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "250000.00",
+  "closing_balance": "285378.57"
+}

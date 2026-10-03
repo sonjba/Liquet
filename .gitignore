@@ -1,0 +1,6 @@
+# --- Environment variables and secrets ---
+.env
+
+# --- Tests ---
+.pytest_cache/
+__pycache__/
