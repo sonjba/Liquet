@@ -1,4 +1,4 @@
-# Liquet — the firm's database (simulated, v1)
+# Liquet - the firm's database (simulated, v1)
 
 How Kestrel Row Wealth Ltd stores its own records. In development, a local ArangoDB plays this database, filled from generated JSON files.
 
@@ -11,7 +11,7 @@ The design follows the typical document-database style: **one rich document per 
 | Collection | One document per | Lists that grow |
 |---|---|---|
 | `portfolios` | Client | `cash_movements`: every cash movement for that client |
-| `accounts` | Custodian account | `account_movements`: movements that belong to no client (custody fee, interest) |
+| `accounts` | Custodian account | `account_movements`: movements that belong to no client (custody fee, interest); `cash_balances`: the firm's recorded balance at each period end |
 
 There are no separate `clients`, `trades` or `securities` collections. That information lives **inside** the documents above, as it typically does in an embedded design.
 
@@ -102,6 +102,9 @@ One document per custodian account, with the movements that belong to no client.
   "name": "Client cash account",
   "custodian": "Northgate Custody Bank",
   "currency": "GBP",
+  "cash_balances": [
+    {"as_of": "2026-05-31", "balance": "250000.00"}
+  ],
   "account_movements": [
     {
       "movement_id": "CE-2026-05-0031",
@@ -117,12 +120,17 @@ One document per custodian account, with the movements that belong to no client.
 }
 ```
 
+`cash_balances` holds the firm's recorded closing balance of the account at each period end. Reconciliation compares closing balances, so the firm's side needs a starting point, just as the bank statement has an opening balance. For June, the starting point is the balance as of 31 May.
+
 ## How the connector maps this to the canonical format
 
 | Canonical | Comes from |
 |---|---|
 | **`accounts`** | |
 | `account_id`, `custodian`, `currency` | The same fields in `accounts` |
+| **`account_balances`** | |
+| `account_id` | The parent account's `account_id` |
+| `as_of` / `balance` | `cash_balances.as_of` / `cash_balances.balance` |
 | `account_name` | `accounts.name` |
 | **`clients`** | |
 | `client_id` | `portfolios.client.client_id` |

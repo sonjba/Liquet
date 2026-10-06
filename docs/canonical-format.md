@@ -11,6 +11,7 @@ Liquet's own results (verdicts, evidence, approvals) are never written to the fi
 | Collection | One document per | Example ID |
 |---|---|---|
 | `accounts` | Account at the custodian | `ACC-KRW-CASH-01` |
+| `account_balances` | Recorded cash balance of an account on a date | `ACC-KRW-CASH-01` on `2026-05-31` |
 | `clients` | Client | `CL-003` |
 | `portfolios` | Portfolio the firm manages for a client | `PF-CL-003` |
 | `securities` | Security the firm trades | `ATIT` |
@@ -35,6 +36,16 @@ Every canonical document also carries a `source` field saying exactly where in t
 | `account_name` | `"Client cash account"` | |
 | `custodian` | `"Northgate Custody Bank"` | Must match the statement header |
 | `currency` | `"GBP"` | |
+
+## `account_balances`
+
+| Field | Example | Notes |
+|---|---|---|
+| `account_id` | `"ACC-KRW-CASH-01"` | |
+| `as_of` | `"2026-05-31"` | The date the balance applies to (end of day) |
+| `balance` | `"250000.00"` | The firm's recorded cash balance; may be negative if overdrawn |
+
+Identified by `account_id` and `as_of` together. The firm's **opening balance** for a period is the balance as of the day before the period starts: for June, the balance as of 31 May.
 
 ## `clients`
 
@@ -141,6 +152,7 @@ Liquet runs these on whatever a connector returns, before using the data:
 5. **Cash book matches its trade.** A trade settlement's amount equals its trade's `settlement_amount`, and both belong to the same portfolio.
 6. **Money fields are text, not numbers.** A number in a money field is rejected.
 7. **Repeated copies agree.** When the firm's data copies the same fact into several places (a security's name or domicile inside every trade, a client's name inside every movement), all copies must match. A mismatch is reported with every conflicting copy. Liquet never silently picks one.
+8. **An opening balance exists.** There must be an `account_balances` record for the day before the period starts. Without it, closing balances can't be compared.
 
 ## Separating nested data
 
