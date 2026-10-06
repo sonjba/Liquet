@@ -12,18 +12,19 @@ Liquet's own results (verdicts, evidence, approvals) are never written to the fi
 |---|---|---|
 | `accounts` | Account at the custodian | `ACC-KRW-CASH-01` |
 | `clients` | Client | `CL-003` |
+| `portfolios` | Portfolio the firm manages for a client | `PF-CL-003` |
 | `securities` | Security the firm trades | `ATIT` |
 | `trades` | Buy or sell | `TR-26062901` |
 | `cash_book` | Cash movement the firm recorded | `CE-2026-06-0007` |
 
-Every canonical document also carries a `source` field saying exactly where in the firm's data it came from, for example `"portfolios/CL-003/cash_movements/4"`.
+Every canonical document also carries a `source` field saying exactly where in the firm's data it came from, for example `"portfolios/PF-CL-003/cash_movements/4"`.
 
 ## General rules
 
 - **Currency:** GBP only in v1.
 - **Dates:** text, `"YYYY-MM-DD"`.
 - **Money:** text with exactly two decimals, in quotes: `"4852.40"`, never a JSON number. JSON numbers are read as floats, which can quietly change amounts. Never negative. In code: `Decimal`.
-- **Not applicable:** `null`. For example, `client_id` on a trade settlement.
+- **Not applicable:** `null`. For example, `trade_id` on a subscription.
 - **IDs:** every document has an ID that is unique within its collection and never changes. It is also the document's `_key`.
 
 ## `accounts`
@@ -43,6 +44,16 @@ Every canonical document also carries a `source` field saying exactly where in t
 | `name` | `"Priya Nair"` | |
 | `client_type` | `"individual"` | `"individual"` or `"trust"` |
 
+## `portfolios`
+
+| Field | Example | Notes |
+|---|---|---|
+| `portfolio_id` | `"PF-CL-003"` | |
+| `client_id` | `"CL-003"` | The client who owns the portfolio |
+| `account_id` | `"ACC-KRW-CASH-01"` | The custody account the portfolio's cash is held in |
+
+Clients are reached **through** their portfolio. Cash entries and trades record their `portfolio_id`, not a `client_id`, so who owns what is stated in one place only.
+
 ## `securities`
 
 | Field | Example | Notes |
@@ -57,6 +68,7 @@ Every canonical document also carries a `source` field saying exactly where in t
 | Field | Example | Notes |
 |---|---|---|
 | `trade_id` | `"TR-26062901"` | |
+| `portfolio_id` | `"PF-CL-001"` | Portfolio the trade was made for |
 | `account_id` | `"ACC-KRW-CASH-01"` | |
 | `ticker` | `"ALBN"` | |
 | `side` | `"BUY"` | `"BUY"` (cash goes out) or `"SELL"` (cash comes in) |
@@ -80,12 +92,12 @@ Debit = money in, credit = money out, the accounting convention from the bank re
 | `entry_type` | `"SUBSCRIPTION"` | `SUBSCRIPTION`, `WITHDRAWAL`, `TRADE_SETTLEMENT`, `DIVIDEND`, `MANAGEMENT_FEE`, `CUSTODY_FEE`, `INTEREST` |
 | `description` | `"Top-up Priya Nair"` | Free text |
 | `reference` | `"CL-003-SUB-0618"` | The firm's reference (formats below) |
-| `client_id` | `"CL-003"` | For subscriptions and withdrawals, otherwise `null` |
+| `portfolio_id` | `"PF-CL-003"` | Portfolio holding the movement; `null` for account movements (custody fee, interest) |
 | `trade_id` | `null` | For trade settlements, otherwise `null` |
 | `ticker` | `null` | For dividends, otherwise `null` |
 | `debit` | `"5000.00"` | Money in, otherwise `null` |
 | `credit` | `null` | Money out, otherwise `null` |
-| `source` | `"portfolios/CL-003/cash_movements/4"` | Where in the firm's data this entry came from |
+| `source` | `"portfolios/PF-CL-003/cash_movements/4"` | Where in the firm's data this entry came from |
 
 One complete cash entry:
 
@@ -99,12 +111,12 @@ One complete cash entry:
   "entry_type": "SUBSCRIPTION",
   "description": "Top-up Priya Nair",
   "reference": "CL-003-SUB-0618",
-  "client_id": "CL-003",
+  "portfolio_id": "PF-CL-003",
   "trade_id": null,
   "ticker": null,
   "debit": "5000.00",
   "credit": null,
-  "source": "portfolios/CL-003/cash_movements/4"
+  "source": "portfolios/PF-CL-003/cash_movements/4"
 }
 ```
 
@@ -123,10 +135,10 @@ One complete cash entry:
 Liquet runs these on whatever a connector returns, before using the data:
 
 1. **IDs are unique** within each collection.
-2. **Every reference to another collection exists.** Each `account_id`, `client_id`, `trade_id` and `ticker` points to a real document.
+2. **Every reference to another collection exists.** Each `account_id`, `client_id`, `portfolio_id`, `trade_id` and `ticker` points to a real document.
 3. **Trades add up.** `settlement_amount` matches quantity × price ± costs.
-4. **Cash book entries:** exactly one of `debit` or `credit` is filled, and the right link field is filled for the `entry_type`. A `TRADE_SETTLEMENT` has a `trade_id`, a `DIVIDEND` has a `ticker`, and so on.
-5. **Cash book matches its trade.** A trade settlement's amount equals its trade's `settlement_amount`.
+4. **Cash book entries:** exactly one of `debit` or `credit` is filled, and the right link fields are filled for the `entry_type`: client movements have a `portfolio_id`, account movements (`CUSTODY_FEE`, `INTEREST`) don't; a `TRADE_SETTLEMENT` has a `trade_id`; a `DIVIDEND` has a `ticker`.
+5. **Cash book matches its trade.** A trade settlement's amount equals its trade's `settlement_amount`, and both belong to the same portfolio.
 6. **Money fields are text, not numbers.** A number in a money field is rejected.
 7. **Repeated copies agree.** When the firm's data copies the same fact into several places (a security's name or domicile inside every trade, a client's name inside every movement), all copies must match. A mismatch is reported with every conflicting copy. Liquet never silently picks one.
 
@@ -134,7 +146,7 @@ Liquet runs these on whatever a connector returns, before using the data:
 
 When the firm stores data nested (one big document per client, with lists inside), the connector takes it apart into canonical documents. Three rules:
 
-1. **Carry the parent's identity into each child.** A movement inside a client's portfolio doesn't mention the client; it just sits inside the document. The connector adds `client_id` (and anything else the parent knows) to each movement it takes out, so the link isn't lost.
+1. **Carry the parent's identity into each child.** A movement inside a client's portfolio doesn't mention the client; it just sits inside the document. The connector adds `portfolio_id` (and anything else the parent knows) to each movement it takes out, so the link isn't lost.
 2. **Check repeated copies; never silently pick one.** See check 7.
 3. **Record where each document came from** in its `source` field, so any explanation can point back to the exact place in the firm's data.
 
@@ -147,14 +159,14 @@ Liquet asks for data through one set of functions, for example `get_cash_entries
 | **Document database** | AQL queries against the firm's ArangoDB, with a read-only user. Takes nested lists apart into canonical documents. | Version 1 |
 | **Relational database** | SQL queries, with the results mapped to these fields | Later |
 
-For testing: a file connector offers the same functions but reads the firm's data from JSON files instead of the database. Tests use it, so they run without a database.
-
 Everything after the connector (checks, graph, matching and the agent) works the same whichever connector is used.
+
+**For testing:** a file connector offers the same functions but reads the firm's data from JSON files instead of the database. Tests use it, so they run without a database.
 
 ## Decisions to review
 
 1. **Liquet reads the firm's database directly, read-only,** and keeps its own results separately. The firm's official record is never changed.
-2. **Links in the canonical format are explicit fields** (`client_id`, `trade_id`, `ticker`). When the firm's data is nested, the connector adds them from the parent document. The hard linking is between the **bank** and the firm: bank lines carry only text, like `PN TOPUP`, and that's where matching rules and the agent do their work.
+2. **Links in the canonical format are explicit fields** (`portfolio_id`, `trade_id`, `ticker`), and clients are reached through their portfolio. When the firm's data is nested, the connector adds them from the parent document. The hard linking is between the **bank** and the firm: bank lines carry only text, like `PN TOPUP`, and that's where matching rules and the agent do their work.
 3. **Debit and credit in the cash book,** like the reconciliation method. The reader converts both sides to one signed amount: positive = money in.
 4. **Money as quoted text, `null` for not applicable.** Exact amounts, and no confusion between "empty" and "zero".
 5. **Dividends are recorded gross** (what the firm expects). The difference from a net payment at the bank is a real break to explain.

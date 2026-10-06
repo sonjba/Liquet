@@ -1,0 +1,289 @@
+# Liquet - graph map (v1)
+#
+# How canonical records become a graph. The graph builder reads this file;
+# the agent reads it to understand what exists and what each link means.
+#
+# The graph is built from CANONICAL records (see docs/canonical-format.md and
+# docs/file-formats.md), never from the firm's document structure.
+# This file does not contain matching logic: matching rules live in the
+# matching engine, and their results are the `reconciliation` edges below.
+
+version: 1
+
+graph:
+  name: liquet
+  description: >
+    Cash records of Kestrel Row Wealth Ltd and the bank's statements for the
+    same pooled custody account, connected so that differences between the
+    two can be traced and explained.
+
+conventions:
+  identifiers: >
+    Every node has a stable key, unique within its collection.
+  amounts: >
+    Money is Decimal. `amount` is signed: positive = money into the account,
+    negative = money out. It is derived by the reader from debit/credit
+    (firm side) or paid_in/paid_out (bank side).
+  dates: >
+    ISO 8601 (YYYY-MM-DD).
+  time: >
+    `time` names the field that dates an edge, and which end it is read from.
+    `null` means the link is not tied to a moment.
+  is_event: >
+    true if the edge records something that happened at a point in business
+    time (a settlement, a dividend payment); false if it only states a
+    structural fact (who owns what, what belongs where).
+  cardinality: >
+    `from` = how many edges of this type each from-node has;
+    `to` = how many each to-node has. Written as 1, 0..1, 0..*, 1..*.
+    The graph builder checks these after building and stops if any fails.
+
+nodes:
+
+  # ---------------- firm side ----------------
+
+  Client:
+    collection: clients
+    key: client_id
+    description: A person or trust whose money the firm manages.
+    fields:
+      client_id: Stable client identifier, e.g. CL-003.
+      name: Client's name.
+      client_type: individual or trust.
+
+  Portfolio:
+    collection: portfolios
+    key: portfolio_id
+    description: >
+      Everything the firm manages for one client. Its cash sits in a pooled
+      custody account shared with other portfolios.
+    fields:
+      portfolio_id: Stable portfolio identifier, e.g. PF-CL-003.
+      client_id: The client who owns the portfolio.
+      account_id: The custody account the portfolio's cash is held in.
+
+  Account:
+    collection: accounts
+    key: account_id
+    description: >
+      The pooled client cash account at the custodian. The bank sees only
+      this account, not the portfolios behind it.
+    fields:
+      account_id: Stable account identifier, e.g. ACC-KRW-CASH-01.
+      account_name: Account name.
+      custodian: The bank holding the account.
+      currency: Account currency (GBP in v1).
+
+  CashMovement:
+    collection: cash_book
+    key: entry_id
+    description: >
+      One cash movement the firm recorded. Client movements belong to a
+      portfolio; account movements (custody fee, interest) belong to no client.
+    fields:
+      entry_id: Stable identifier, e.g. CE-2026-06-0007.
+      portfolio_id: Portfolio holding the movement; null for account movements.
+      account_id: Account the movement is on.
+      date: When the movement happened (for trades, the trade date).
+      recorded_at: When the firm recorded it. Lets us ask what was known, and when.
+      entry_type: >
+        SUBSCRIPTION, WITHDRAWAL, TRADE_SETTLEMENT, DIVIDEND, MANAGEMENT_FEE,
+        CUSTODY_FEE or INTEREST.
+      description: The firm's narrative.
+      reference: The firm's reference, e.g. CL-003-SUB-0618 or TR-26062901.
+      trade_id: Trade settled by this movement, if any.
+      ticker: Security paying the dividend, if any.
+      amount: Signed amount (derived from debit/credit).
+      source: Where in the firm's data this record came from.
+
+  Trade:
+    collection: trades
+    key: trade_id
+    description: >
+      A buy or sell agreed on the trade date. Its cash moves later, on the
+      settlement date.
+    fields:
+      trade_id: Firm trade reference, e.g. TR-26062901.
+      portfolio_id: Portfolio the trade was made for.
+      account_id: Account the trade settles through.
+      ticker: Security traded.
+      side: BUY (cash goes out) or SELL (cash comes in).
+      trade_date: When the trade was agreed.
+      settlement_date: When the cash moves (T+2).
+      quantity: Number of units.
+      price: Price per unit.
+      costs: Trading costs.
+      settlement_amount: Cash expected to move on the settlement date.
+
+  Security:
+    collection: securities
+    key: ticker
+    description: A financial instrument the firm trades or receives dividends from.
+    fields:
+      ticker: Ticker, used as the identifier, e.g. ATIT.
+      name: Instrument name.
+      security_type: share or fund.
+      domicile: uk or overseas. Overseas dividends may arrive net of tax.
+
+  # ---------------- bank side ----------------
+
+  BankStatement:
+    collection: bank_statements
+    key: statement_id
+    description: The custodian's statement of one account for one period.
+    fields:
+      statement_id: Stable statement identifier.
+      account_id: Account the statement is for.
+      custodian: Bank that issued it.
+      currency: Statement currency.
+      period_start: First day covered.
+      period_end: Last day covered.
+      opening_balance: Balance at the start of the period.
+      closing_balance: Balance at the end of the period.
+      source: The file the statement was read from.
+
+  BankEntry:
+    collection: bank_entries
+    key: line_id
+    description: >
+      One line of the bank statement: what the bank says happened. The bank
+      knows the account, not the client or the trade behind a line.
+    fields:
+      line_id: Stable identifier for the line.
+      statement_id: Statement containing the line.
+      date: Date the bank booked it.
+      description: The bank's text, often abbreviated, e.g. PN TOPUP.
+      reference: The bank's reference, often empty.
+      amount: Signed amount (derived from paid_in/paid_out).
+      balance: Running balance after this line.
+      line_number: Line number in the source file.
+
+edges:
+
+  # Facts that follow directly from canonical fields. Built when the graph is built.
+  structural:
+
+    OWNS_PORTFOLIO:
+      from: Client
+      to: Portfolio
+      build: {rule: field_equality, from_field: client_id, to_field: client_id}
+      time: null
+      is_event: false
+      cardinality: {from: "1..*", to: "1"}
+      meaning: The client owns this portfolio.
+
+    USES_ACCOUNT:
+      from: Portfolio
+      to: Account
+      build: {rule: field_equality, from_field: account_id, to_field: account_id}
+      time: null
+      is_event: false
+      cardinality: {from: "1", to: "0..*"}
+      meaning: The portfolio's cash is held in this pooled account.
+
+    HAS_MOVEMENT:
+      from: Portfolio
+      to: CashMovement
+      build: {rule: field_equality, from_field: portfolio_id, to_field: portfolio_id}
+      time: {node: to, field: date}
+      is_event: false
+      cardinality: {from: "0..*", to: "0..1"}
+      meaning: >
+        The movement belongs to this portfolio. Account movements (custody fee,
+        interest) have no portfolio.
+
+    ON_ACCOUNT:
+      from: CashMovement
+      to: Account
+      build: {rule: field_equality, from_field: account_id, to_field: account_id}
+      time: {node: from, field: date}
+      is_event: false
+      cardinality: {from: "1", to: "0..*"}
+      meaning: The movement is on this account. Every movement has exactly one.
+
+    HAS_TRADE:
+      from: Portfolio
+      to: Trade
+      build: {rule: field_equality, from_field: portfolio_id, to_field: portfolio_id}
+      time: {node: to, field: trade_date}
+      is_event: false
+      cardinality: {from: "0..*", to: "1"}
+      meaning: The trade was made for this portfolio.
+
+    IN_SECURITY:
+      from: Trade
+      to: Security
+      build: {rule: field_equality, from_field: ticker, to_field: ticker}
+      time: {node: from, field: trade_date}
+      is_event: false
+      cardinality: {from: "1", to: "0..*"}
+      meaning: The trade is in this security.
+
+    SETTLED_BY:
+      from: Trade
+      to: CashMovement
+      build:
+        rule: field_equality
+        from_field: trade_id
+        to_field: trade_id
+        when: {node: to, field: entry_type, equals: TRADE_SETTLEMENT}
+      time: {node: from, field: settlement_date}
+      is_event: true
+      cardinality: {from: "0..1", to: "0..1"}
+      meaning: >
+        The cash movement is the settlement of this trade. Dated by the
+        settlement date, not the trade date: a trade agreed in one month can
+        settle in the next, which is a timing difference (IN TRANSITU).
+
+    DIVIDEND_ON:
+      from: CashMovement
+      to: Security
+      build:
+        rule: field_equality
+        from_field: ticker
+        to_field: ticker
+        when: {node: from, field: entry_type, equals: DIVIDEND}
+      time: {node: from, field: date}
+      is_event: true
+      cardinality: {from: "0..1", to: "0..*"}
+      meaning: The movement is a dividend paid by this security.
+
+    FOR_ACCOUNT:
+      from: BankStatement
+      to: Account
+      build: {rule: field_equality, from_field: account_id, to_field: account_id}
+      time: {node: from, field: period_end}
+      is_event: false
+      cardinality: {from: "1", to: "0..*"}
+      meaning: The statement is for this account.
+
+    CONTAINS:
+      from: BankStatement
+      to: BankEntry
+      build: {rule: field_equality, from_field: statement_id, to_field: statement_id}
+      time: {node: to, field: date}
+      is_event: false
+      cardinality: {from: "0..*", to: "1"}
+      meaning: The statement contains this line.
+
+  # Conclusions created by Liquet's matching engine, not built
+  # from source data. Stored in Liquet's own results, never in the firm's database.
+  reconciliation:
+
+    MATCHED_TO:
+      from: BankEntry
+      to: CashMovement
+      created_by: matching
+      attributes:
+        verdict: CONGRUIT, DISCREPAT or NON_LIQUET.
+        rule_id: The matching rule (or agent investigation) that produced the verdict.
+        difference_amount: Bank amount minus firm amount; 0.00 when they agree.
+        evidence: Records and facts supporting the verdict.
+        decided_at: When the verdict was produced.
+      time: {node: edge, field: decided_at}
+      is_event: false
+      cardinality: {from: "0..*", to: "0..1"}
+      meaning: >
+        Liquet's conclusion about whether a bank line and a firm movement are
+        the same transaction. One bank line may match several movements, for
+        example one fee transfer covering several clients' management fees.
