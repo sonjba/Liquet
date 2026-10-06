@@ -208,3 +208,39 @@ All data in this repository is synthetic. No real company, client or bank data i
 I used Claude during development for design discussions, code review and some
 code suggestions. I reviewed and tested all code, and I'm responsible for the
 design decisions and the final result.
+
+## Future work
+
+Ideas for later versions, roughly in order. None of these are built yet.
+
+**Learning from repeated investigations**
+Every agent run is logged: the question, the tools called with their inputs, and the result.
+Over time, that log shows which investigations repeat. Frequent ones can be turned into named
+**recipes**: fixed sequences of tested tools with parameters (for example, account and month).
+A simple router then recognises the question and runs the recipe directly, with no LLM call,
+or only a small one to word the explanation. Two safeguards apply:
+- a cached result is never reused if the underlying data has changed since
+- recipes reuse *how* to investigate, never a previous verdict
+
+**Rule proposer**
+When the agent explains the same kind of difference repeatedly (for example, an overseas dividend
+arriving net of withholding tax), it proposes a new deterministic matching rule. A person approves
+it, and from then on the rules engine handles it without AI. The aim is for the AI's role to shrink
+as its findings become tested rules.
+
+**More input formats**
+PDF, Excel, MT940 and camt.053 statements, each through its own reader producing the same
+statement lines. PDF reading would use an LLM, with the existing self-checks (totals, running
+balance, dates) verifying what it read.
+
+**More data sources**
+A relational-database connector alongside the document-database one, returning the same
+canonical format.
+
+**Question front door**
+Plain-language questions ("Which May items are still in transit?") answered by calling the
+same tested tools.
+
+**Broader reconciliation**
+Several accounts and currencies, continuity checks between months, and reconciliation of
+holdings as well as cash.
