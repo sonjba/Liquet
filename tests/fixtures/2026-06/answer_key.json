@@ -1,0 +1,195 @@
+{
+  "month": "2026-06",
+  "account_id": "ACC-KRW-CASH-01",
+  "balances": {
+    "book_opening": "250000.00",
+    "book_closing": "286683.20",
+    "bank_opening": "250000.00",
+    "bank_closing": "285378.57",
+    "adjusted_bank": "286661.57",
+    "adjusted_book": "286661.57",
+    "true_cash_balance": "286661.57"
+  },
+  "note": "Bank lines are identified by their line number in bank_statement.csv (header = line 1).",
+  "matches": [
+    {
+      "bank_line": 2,
+      "entries": [
+        "CE-2026-06-0001"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Same reference and amount"
+    },
+    {
+      "bank_line": 3,
+      "entries": [
+        "CE-2026-06-0002"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Trade reference; bank date = trade settlement date (3 June)"
+    },
+    {
+      "bank_line": 4,
+      "entries": [
+        "CE-2026-06-0003"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Trade reference; bank date = trade settlement date (5 June)"
+    },
+    {
+      "bank_line": 5,
+      "entries": [
+        "CE-2026-06-0004"
+      ],
+      "verdict": "CONGRUIT",
+      "difference": "225.00",
+      "how": "Same dividend reference; bank paid net of 15% withholding tax",
+      "break": "B3"
+    },
+    {
+      "bank_line": 6,
+      "entries": [
+        "CE-2026-06-0005"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Same reference; paid one day after the firm recorded it"
+    },
+    {
+      "bank_line": 7,
+      "entries": [
+        "CE-2026-06-0006"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Trade reference; bank date = trade settlement date (15 June)"
+    },
+    {
+      "bank_line": 8,
+      "entries": [
+        "CE-2026-06-0007"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "No reference match. Two 5,000.00 candidates within a day (CE-0007 Priya Nair, CE-0008 Hart Family Trust); 'NAIR P' identifies Priya",
+      "decoy": "CE-2026-06-0008"
+    },
+    {
+      "bank_line": 9,
+      "entries": [
+        "CE-2026-06-0009"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Same reference and amount"
+    },
+    {
+      "bank_line": 10,
+      "entries": [
+        "CE-2026-06-0010"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Trade reference; bank date = trade settlement date (26 June)"
+    },
+    {
+      "bank_line": 11,
+      "entries": [
+        "CE-2026-06-0012",
+        "CE-2026-06-0013",
+        "CE-2026-06-0014",
+        "CE-2026-06-0015",
+        "CE-2026-06-0016"
+      ],
+      "verdict": "CONGRUIT",
+      "difference": "-36.00",
+      "how": "One fee transfer covers five client fee entries (reference FEE-2026-06); entries total 1,598.50 against 1,562.50",
+      "break": "B6"
+    }
+  ],
+  "breaks": [
+    {
+      "id": "B1",
+      "category": "IN_TRANSITU",
+      "type": "DEPOSIT_IN_TRANSIT",
+      "entries": [
+        "CE-2026-06-0008"
+      ],
+      "bank_lines": [],
+      "amount": "5000.00",
+      "adjust_side": "bank",
+      "adjustment": "+5000.00",
+      "explanation": "Hart Family Trust subscription recorded 19 June; arrives at the bank 1 July.",
+      "journal": null
+    },
+    {
+      "id": "B2",
+      "category": "IN_TRANSITU",
+      "type": "OUTSTANDING_PAYMENT",
+      "entries": [
+        "CE-2026-06-0011"
+      ],
+      "bank_lines": [],
+      "amount": "3717.00",
+      "adjust_side": "bank",
+      "adjustment": "-3717.00",
+      "explanation": "Buy 300 ALBN (TR-26062901) agreed 29 June, settles 1 July (T+2).",
+      "journal": null
+    },
+    {
+      "id": "B3",
+      "category": "OMISSUM",
+      "type": "WITHHOLDING_TAX",
+      "entries": [
+        "CE-2026-06-0004"
+      ],
+      "bank_lines": [
+        5
+      ],
+      "amount": "225.00",
+      "adjust_side": "book",
+      "adjustment": "-225.00",
+      "explanation": "ATIT is an overseas fund; the dividend of 1,500.00 was paid net of 15% withholding tax (225.00), which the firm has not recorded.",
+      "journal": "Dr Withholding tax 225.00 / Cr Cash 225.00"
+    },
+    {
+      "id": "B4",
+      "category": "OMISSUM",
+      "type": "BANK_FEE",
+      "entries": [],
+      "bank_lines": [
+        12
+      ],
+      "amount": "45.00",
+      "adjust_side": "book",
+      "adjustment": "-45.00",
+      "explanation": "June custody fee charged by Northgate, not yet recorded.",
+      "journal": "Dr Custody fees 45.00 / Cr Cash 45.00"
+    },
+    {
+      "id": "B5",
+      "category": "OMISSUM",
+      "type": "INTEREST",
+      "entries": [],
+      "bank_lines": [
+        13
+      ],
+      "amount": "212.37",
+      "adjust_side": "book",
+      "adjustment": "+212.37",
+      "explanation": "June credit interest paid by Northgate, not yet recorded.",
+      "journal": "Dr Cash 212.37 / Cr Interest income 212.37"
+    },
+    {
+      "id": "B6",
+      "category": "ERRATUM",
+      "type": "BOOK_ERROR",
+      "entries": [
+        "CE-2026-06-0012"
+      ],
+      "bank_lines": [
+        11
+      ],
+      "amount": "36.00",
+      "adjust_side": "book",
+      "adjustment": "+36.00",
+      "explanation": "Amelia Hart's management fee recorded as 473.50 instead of 437.50 (digits swapped; the difference 36.00 is divisible by 9).",
+      "journal": "Correct CE-2026-06-0012 from 473.50 to 437.50 (cash +36.00)"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "_key": "ACC-KRW-CASH-01",
+    "account_id": "ACC-KRW-CASH-01",
+    "name": "Client cash account",
+    "custodian": "Northgate Custody Bank",
+    "currency": "GBP",
+    "cash_balances": [
+      {
+        "as_of": "2026-05-31",
+        "balance": "250000.00"
+      }
+    ],
+    "account_movements": [
+      {
+        "movement_id": "CE-2026-05-0030",
+        "value_date": "2026-05-31",
+        "entered_on": "2026-05-31",
+        "kind": "INTEREST",
+        "narrative": "Credit interest May",
+        "our_ref": "INT-2026-05",
+        "direction": "IN",
+        "amount": "198.44"
+      }
+    ]
+  }
+]

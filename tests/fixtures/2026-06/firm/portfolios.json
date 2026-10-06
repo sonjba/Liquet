@@ -1,0 +1,310 @@
+[
+  {
+    "_key": "PF-CL-001",
+    "portfolio_id": "PF-CL-001",
+    "custody_account": "ACC-KRW-CASH-01",
+    "client": {
+      "client_id": "CL-001",
+      "full_name": "Amelia Hart",
+      "type": "individual"
+    },
+    "cash_movements": [
+      {
+        "movement_id": "CE-2026-06-0001",
+        "value_date": "2026-06-01",
+        "entered_on": "2026-06-01",
+        "kind": "SUBSCRIPTION",
+        "narrative": "Subscription Amelia Hart",
+        "our_ref": "CL-001-SUB-0601",
+        "direction": "IN",
+        "amount": "25000.00"
+      },
+      {
+        "movement_id": "CE-2026-06-0002",
+        "value_date": "2026-06-01",
+        "entered_on": "2026-06-01",
+        "kind": "TRADE_SETTLEMENT",
+        "narrative": "Buy 400 ALBN",
+        "our_ref": "TR-26060101",
+        "direction": "OUT",
+        "amount": "4852.40",
+        "trade": {
+          "trade_ref": "TR-26060101",
+          "side": "BUY",
+          "trade_date": "2026-06-01",
+          "settle_date": "2026-06-03",
+          "qty": 400,
+          "unit_price": "12.10",
+          "fees": "12.40",
+          "consideration": "4852.40",
+          "security": {
+            "ticker": "ALBN",
+            "name": "Albion Utilities plc",
+            "type": "share",
+            "domicile": "uk"
+          }
+        }
+      },
+      {
+        "movement_id": "CE-2026-06-0011",
+        "value_date": "2026-06-29",
+        "entered_on": "2026-06-29",
+        "kind": "TRADE_SETTLEMENT",
+        "narrative": "Buy 300 ALBN",
+        "our_ref": "TR-26062901",
+        "direction": "OUT",
+        "amount": "3717.00",
+        "trade": {
+          "trade_ref": "TR-26062901",
+          "side": "BUY",
+          "trade_date": "2026-06-29",
+          "settle_date": "2026-07-01",
+          "qty": 300,
+          "unit_price": "12.35",
+          "fees": "12.00",
+          "consideration": "3717.00",
+          "security": {
+            "ticker": "ALBN",
+            "name": "Albion Utilities plc",
+            "type": "share",
+            "domicile": "uk"
+          }
+        }
+      },
+      {
+        "movement_id": "CE-2026-06-0012",
+        "value_date": "2026-06-30",
+        "entered_on": "2026-06-30",
+        "kind": "MANAGEMENT_FEE",
+        "narrative": "Management fee June Amelia Hart",
+        "our_ref": "FEE-2026-06",
+        "direction": "OUT",
+        "amount": "473.50"
+      }
+    ]
+  },
+  {
+    "_key": "PF-CL-002",
+    "portfolio_id": "PF-CL-002",
+    "custody_account": "ACC-KRW-CASH-01",
+    "client": {
+      "client_id": "CL-002",
+      "full_name": "Daniel Okoro",
+      "type": "individual"
+    },
+    "cash_movements": [
+      {
+        "movement_id": "CE-2026-06-0006",
+        "value_date": "2026-06-11",
+        "entered_on": "2026-06-11",
+        "kind": "TRADE_SETTLEMENT",
+        "narrative": "Buy 1000 THIX",
+        "our_ref": "TR-26061101",
+        "direction": "OUT",
+        "amount": "8262.00",
+        "trade": {
+          "trade_ref": "TR-26061101",
+          "side": "BUY",
+          "trade_date": "2026-06-11",
+          "settle_date": "2026-06-15",
+          "qty": 1000,
+          "unit_price": "8.25",
+          "fees": "12.00",
+          "consideration": "8262.00",
+          "security": {
+            "ticker": "THIX",
+            "name": "Thames Index Fund",
+            "type": "fund",
+            "domicile": "uk"
+          }
+        }
+      },
+      {
+        "movement_id": "CE-2026-06-0009",
+        "value_date": "2026-06-22",
+        "entered_on": "2026-06-22",
+        "kind": "SUBSCRIPTION",
+        "narrative": "Subscription Daniel Okoro",
+        "our_ref": "CL-002-SUB-0622",
+        "direction": "IN",
+        "amount": "15000.00"
+      },
+      {
+        "movement_id": "CE-2026-06-0013",
+        "value_date": "2026-06-30",
+        "entered_on": "2026-06-30",
+        "kind": "MANAGEMENT_FEE",
+        "narrative": "Management fee June Daniel Okoro",
+        "our_ref": "FEE-2026-06",
+        "direction": "OUT",
+        "amount": "312.50"
+      }
+    ]
+  },
+  {
+    "_key": "PF-CL-003",
+    "portfolio_id": "PF-CL-003",
+    "custody_account": "ACC-KRW-CASH-01",
+    "client": {
+      "client_id": "CL-003",
+      "full_name": "Priya Nair",
+      "type": "individual"
+    },
+    "cash_movements": [
+      {
+        "movement_id": "CE-2026-06-0003",
+        "value_date": "2026-06-03",
+        "entered_on": "2026-06-03",
+        "kind": "TRADE_SETTLEMENT",
+        "narrative": "Sell 250 SEVN",
+        "our_ref": "TR-26060302",
+        "direction": "IN",
+        "amount": "6187.50",
+        "trade": {
+          "trade_ref": "TR-26060302",
+          "side": "SELL",
+          "trade_date": "2026-06-03",
+          "settle_date": "2026-06-05",
+          "qty": 250,
+          "unit_price": "24.80",
+          "fees": "12.50",
+          "consideration": "6187.50",
+          "security": {
+            "ticker": "SEVN",
+            "name": "Severn Pharma plc",
+            "type": "share",
+            "domicile": "uk"
+          }
+        }
+      },
+      {
+        "movement_id": "CE-2026-06-0007",
+        "value_date": "2026-06-18",
+        "entered_on": "2026-06-19",
+        "kind": "SUBSCRIPTION",
+        "narrative": "Top-up Priya Nair",
+        "our_ref": "CL-003-SUB-0618",
+        "direction": "IN",
+        "amount": "5000.00"
+      },
+      {
+        "movement_id": "CE-2026-06-0014",
+        "value_date": "2026-06-30",
+        "entered_on": "2026-06-30",
+        "kind": "MANAGEMENT_FEE",
+        "narrative": "Management fee June Priya Nair",
+        "our_ref": "FEE-2026-06",
+        "direction": "OUT",
+        "amount": "187.50"
+      }
+    ]
+  },
+  {
+    "_key": "PF-CL-004",
+    "portfolio_id": "PF-CL-004",
+    "custody_account": "ACC-KRW-CASH-01",
+    "client": {
+      "client_id": "CL-004",
+      "full_name": "Thomas Reid",
+      "type": "individual"
+    },
+    "cash_movements": [
+      {
+        "movement_id": "CE-2026-06-0004",
+        "value_date": "2026-06-10",
+        "entered_on": "2026-06-10",
+        "kind": "DIVIDEND",
+        "narrative": "Dividend ATIT",
+        "our_ref": "DIV-ATIT-0610",
+        "direction": "IN",
+        "amount": "1500.00",
+        "dividend": {
+          "security": {
+            "ticker": "ATIT",
+            "name": "Atlantic Income Trust",
+            "type": "fund",
+            "domicile": "overseas"
+          }
+        }
+      },
+      {
+        "movement_id": "CE-2026-06-0005",
+        "value_date": "2026-06-11",
+        "entered_on": "2026-06-11",
+        "kind": "WITHDRAWAL",
+        "narrative": "Withdrawal Thomas Reid",
+        "our_ref": "CL-004-WD-0611",
+        "direction": "OUT",
+        "amount": "10000.00"
+      },
+      {
+        "movement_id": "CE-2026-06-0015",
+        "value_date": "2026-06-30",
+        "entered_on": "2026-06-30",
+        "kind": "MANAGEMENT_FEE",
+        "narrative": "Management fee June Thomas Reid",
+        "our_ref": "FEE-2026-06",
+        "direction": "OUT",
+        "amount": "375.00"
+      }
+    ]
+  },
+  {
+    "_key": "PF-CL-005",
+    "portfolio_id": "PF-CL-005",
+    "custody_account": "ACC-KRW-CASH-01",
+    "client": {
+      "client_id": "CL-005",
+      "full_name": "Hart Family Trust",
+      "type": "trust"
+    },
+    "cash_movements": [
+      {
+        "movement_id": "CE-2026-06-0008",
+        "value_date": "2026-06-19",
+        "entered_on": "2026-06-19",
+        "kind": "SUBSCRIPTION",
+        "narrative": "Subscription Hart Family Trust",
+        "our_ref": "CL-005-SUB-0619",
+        "direction": "IN",
+        "amount": "5000.00"
+      },
+      {
+        "movement_id": "CE-2026-06-0010",
+        "value_date": "2026-06-24",
+        "entered_on": "2026-06-24",
+        "kind": "TRADE_SETTLEMENT",
+        "narrative": "Sell 600 ALBN",
+        "our_ref": "TR-26062401",
+        "direction": "IN",
+        "amount": "7425.60",
+        "trade": {
+          "trade_ref": "TR-26062401",
+          "side": "SELL",
+          "trade_date": "2026-06-24",
+          "settle_date": "2026-06-26",
+          "qty": 600,
+          "unit_price": "12.40",
+          "fees": "14.40",
+          "consideration": "7425.60",
+          "security": {
+            "ticker": "ALBN",
+            "name": "Albion Utilities plc",
+            "type": "share",
+            "domicile": "uk"
+          }
+        }
+      },
+      {
+        "movement_id": "CE-2026-06-0016",
+        "value_date": "2026-06-30",
+        "entered_on": "2026-06-30",
+        "kind": "MANAGEMENT_FEE",
+        "narrative": "Management fee June Hart Family Trust",
+        "our_ref": "FEE-2026-06",
+        "direction": "OUT",
+        "amount": "250.00"
+      }
+    ]
+  }
+]
