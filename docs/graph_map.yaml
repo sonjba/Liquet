@@ -1,4 +1,4 @@
-# Liquet - graph map (v1)
+# Liquet — graph map (v1)
 #
 # How canonical records become a graph. The graph builder reads this file;
 # the agent reads it to understand what exists and what each link means.
@@ -6,7 +6,8 @@
 # The graph is built from CANONICAL records (see docs/canonical-format.md and
 # docs/file-formats.md), never from the firm's document structure.
 # This file does not contain matching logic: matching rules live in the
-# matching engine, and their results are the `reconciliation` edges below.
+# matching engine (see docs/matching-rules.md), and their results are the
+# `reconciliation` edges and the `Finding` result node below.
 
 version: 1
 
@@ -158,6 +159,35 @@ nodes:
       balance: Running balance after this line.
       line_number: Line number in the source file.
 
+# Records created by Liquet itself, never read from the firm's database or the
+# bank's files. Stored in Liquet's own results store.
+result_nodes:
+
+  Finding:
+    collection: findings
+    key: finding_id
+    description: >
+      One explained difference, or one unmatched item with a proposed
+      explanation. A finding is a node, not an edge, because it has a life of
+      its own (a status, an approval, a journal) and can concern several
+      records at once, for example five fee entries and one bank line.
+    fields:
+      finding_id: Stable identifier, e.g. FND-2026-06-03.
+      statement_id: The bank statement (month) the finding belongs to.
+      category: IN_TRANSITU, OMISSUM or ERRATUM.
+      type: >
+        DEPOSIT_IN_TRANSIT, OUTSTANDING_PAYMENT, WITHHOLDING_TAX, BANK_FEE,
+        INTEREST or BOOK_ERROR. Open list; new types are added as cases appear.
+      amount: Size of the difference, always positive.
+      adjust_side: bank or book. Which side of the reconciliation it adjusts.
+      adjustment: Signed amount added to that side's closing balance.
+      explanation: Plain-language reason.
+      status: PROPOSED, APPROVED or REJECTED. Only a person approves.
+      proposed_by: The rule id, or "agent", that proposed it.
+      evidence: Records and facts supporting it.
+      proposed_at: When it was proposed.
+      decided_at: When a person approved or rejected it; null while proposed.
+
 edges:
 
   # Facts that follow directly from canonical fields. Built when the graph is built.
@@ -266,7 +296,7 @@ edges:
       cardinality: {from: "0..*", to: "1"}
       meaning: The statement contains this line.
 
-  # Conclusions created by Liquet's matching engine, not built
+  # Conclusions created by Liquet's matching engine (and the agent), not built
   # from source data. Stored in Liquet's own results, never in the firm's database.
   reconciliation:
 
@@ -275,15 +305,56 @@ edges:
       to: CashMovement
       created_by: matching
       attributes:
-        verdict: CONGRUIT, DISCREPAT or NON_LIQUET.
+        verdict: >
+          CONGRUIT (same transaction), DISCREPAT (evidence they are not the
+          same) or NON_LIQUET (a candidate, but not enough evidence).
         rule_id: The matching rule (or agent investigation) that produced the verdict.
-        difference_amount: Bank amount minus firm amount; 0.00 when they agree.
+        differences: >
+          List of the ways the two records disagree. Each item has field
+          (amount, date or reference), bank_value, firm_value and, for amounts,
+          difference (bank minus firm). Empty when everything agrees. A
+          difference does not make the verdict DISCREPAT: the pair can be the
+          same transaction and still disagree.
         evidence: Records and facts supporting the verdict.
         decided_at: When the verdict was produced.
       time: {node: edge, field: decided_at}
       is_event: false
-      cardinality: {from: "0..*", to: "0..1"}
+      cardinality: {from: "0..*", to: "0..*"}
+      constraints:
+        - Each CashMovement has at most one CONGRUIT edge.
+        - DISCREPAT and NON_LIQUET edges record candidates that were considered, so the reasoning is kept.
+        - An item with no candidate at all gets no MATCHED_TO edge; it gets a Finding.
       meaning: >
         Liquet's conclusion about whether a bank line and a firm movement are
-        the same transaction. One bank line may match several movements, for
-        example one fee transfer covering several clients' management fees.
+        the same transaction, and how they differ. One bank line may match
+        several movements, for example one fee transfer covering several
+        clients' management fees.
+
+    EXPLAINS_MOVEMENT:
+      from: Finding
+      to: CashMovement
+      created_by: matching
+      time: {node: from, field: proposed_at}
+      is_event: false
+      cardinality: {from: "0..*", to: "0..*"}
+      meaning: The finding concerns this firm movement (timing difference, error, ...).
+
+    EXPLAINS_LINE:
+      from: Finding
+      to: BankEntry
+      created_by: matching
+      time: {node: from, field: proposed_at}
+      is_event: false
+      cardinality: {from: "0..*", to: "0..*"}
+      meaning: >
+        The finding concerns this bank line (for example a fee the firm has
+        not recorded). A finding may concern movements, lines, or both.
+
+    FINDING_FOR:
+      from: Finding
+      to: BankStatement
+      created_by: matching
+      time: {node: from, field: proposed_at}
+      is_event: false
+      cardinality: {from: "1", to: "0..*"}
+      meaning: The finding belongs to this statement's reconciliation (this month).
