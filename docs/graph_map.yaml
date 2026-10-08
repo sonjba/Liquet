@@ -75,6 +75,24 @@ nodes:
       custodian: The bank holding the account.
       currency: Account currency (GBP in v1).
 
+  AccountBalance:
+    collection: account_balances
+    key: [account_id, as_of]
+    description: >
+      The balance of an account that the firm recorded for one date. It is the
+      starting point for the firm's side: the opening balance for a period is
+      the balance as of the day before it starts. Balances for other dates are
+      calculated (the latest recorded balance plus the movements since), not
+      stored. A new record is added when the firm records a balance; old ones
+      are kept, so past opening balances can still be asked for.
+    fields:
+      account_id: Account the balance is for.
+      as_of: >
+        The date the balance applies to (end of that day). The firm's data has
+        no separate "recorded on" date for balances in v1.
+      balance: The firm's recorded balance. May be negative if overdrawn.
+      source: Where in the firm's data this record came from.
+
   CashMovement:
     collection: cash_book
     key: entry_id
@@ -210,6 +228,17 @@ edges:
       is_event: false
       cardinality: {from: "1", to: "0..*"}
       meaning: The portfolio's cash is held in this pooled account.
+
+    HAS_BALANCE:
+      from: Account
+      to: AccountBalance
+      build: {rule: field_equality, from_field: account_id, to_field: account_id}
+      time: {node: to, field: as_of}
+      is_event: false
+      cardinality: {from: "0..*", to: "1"}
+      meaning: >
+        The firm recorded this balance for the account on this date. An
+        account has one per recorded date, so its history is kept.
 
     HAS_MOVEMENT:
       from: Portfolio
