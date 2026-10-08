@@ -27,9 +27,27 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-REQUIRED_COLUMNS = ["date", "description", "reference", "paid_in", "paid_out", "balance"]
-REQUIRED_HEADER_FIELDS = ["account_id", "custodian", "currency", "period_start",
-                          "period_end", "opening_balance", "closing_balance"]
+# Liquet's name : the header's name in the bank's file
+HEADER_FIELDS = {
+    "account_id" : "account_id",
+    "custodian" : "custodian",
+    "currency" : "currency",
+    "period_start" : "period_start",
+    "period_end" : "period_end",
+    "opening_balance" : "opening_balance",
+    "closing_balance" : "closing_balance"
+}
+
+
+# Liquet's name : the column's name in the bank's file
+COLUMNS = {
+    "date": "date",
+    "description": "description",
+    "reference": "reference",
+    "paid_in": "paid_in",
+    "paid_out": "paid_out",
+    "balance": "balance",
+}
 
 def parse_money(text: str, where: str, allow_negative: bool = False) -> Decimal | None:
     text = text.strip()
@@ -52,13 +70,15 @@ def read_header(header_path: Path) -> dict:
     
     with open(header_path, "r", encoding="utf-8") as header_data:
         try:
-            header = json.load(header_data)
+            raw = json.load(header_data)
         except json.JSONDecodeError as error:
             raise ValueError(f"Header file is not valid JSON: {error}")
 
-    missing = [field for field in REQUIRED_HEADER_FIELDS if field not in header]
+    missing = [field for field in HEADER_FIELDS.values() if field not in raw]
     if missing:
         raise ValueError(f"Header is missing fields: {missing}")
+
+    header = {liquet_header_name: raw[bank_header_name] for liquet_header_name, bank_header_name in HEADER_FIELDS.items()}
 
     for field in ("period_start", "period_end"):
         try:
@@ -84,10 +104,11 @@ def read_lines(lines_path: Path) -> list[dict]:
     lines = []
     with open(lines_path, "r", encoding="utf-8-sig", newline="") as lines_data:
         reader = csv.DictReader(lines_data)
-        missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
+        missing = [c for c in COLUMNS.values() if c not in (reader.fieldnames or [])]
         if missing:
             raise ValueError(f"Missing columns: {missing}")
-        for line_number, line in enumerate(reader, start=2):
+        for line_number, row in enumerate(reader, start=2):
+            line = {liquet_column_name: row[bank_column_name] for liquet_column_name, bank_column_name in COLUMNS.items()}
             line["line_number"] = line_number
 
             try:
@@ -147,19 +168,33 @@ def check_dates(header: dict, lines: list[dict]) -> tuple[bool, str]:
 
 
 
-if __name__ == "__main__":
-    header = read_header(Path("tests/fixtures/2026-06/statement_header.json"))
-    lines = read_lines(Path("tests/fixtures/2026-06/bank_statement.csv"))
+def read_statement(header_path: Path, lines_path: Path) -> tuple[dict, list[dict]]:
+    header = read_header(header_path)
+    lines = read_lines(lines_path)
+    checks = [check_totals, check_running_balance, check_dates]
+    for check in checks:
+        ok, message = check(header, lines)
+        if not ok:
+            raise ValueError(f"Statement check failed: {message}")
+    return header, lines
 
-    totals_ok, totals_message = check_totals(header, lines)
-    running_ok, running_message = check_running_balance(header, lines)
-    dates_ok, dates_message = check_dates(header, lines)
 
-    print("PASS" if totals_ok else "FAIL", "totals:", totals_message)
-    print("PASS" if running_ok else "FAIL", "running balance:", running_message)
-    print("PASS" if dates_ok else "FAIL", "dates:", dates_message)
+# if __name__ == "__main__":
+#     header = read_header(Path("tests/fixtures/2026-06/statement_header.json"))
+#     lines = read_lines(Path("tests/fixtures/2026-06/bank_statement.csv"))
 
-    if totals_ok and running_ok and dates_ok:
-        print("Statement checks passed")
-    else:
-        print("Statement checks FAILED: do not reconcile this statement")
+#     totals_ok, totals_message = check_totals(header, lines)
+#     running_ok, running_message = check_running_balance(header, lines)
+#     dates_ok, dates_message = check_dates(header, lines)
+
+#     print("PASS" if totals_ok else "FAIL", "totals:", totals_message)
+#     print("PASS" if running_ok else "FAIL", "running balance:", running_message)
+#     print("PASS" if dates_ok else "FAIL", "dates:", dates_message)
+
+#     if totals_ok and running_ok and dates_ok:
+#         print("Statement checks passed")
+#     else:
+#         print("Statement checks FAILED: do not reconcile this statement")
+
+
+print(read_statement(Path("tests/fixtures/2026-06/statement_header.json"), Path("tests/fixtures/2026-06/bank_statement.csv")))
