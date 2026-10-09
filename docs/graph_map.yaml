@@ -386,4 +386,21 @@ edges:
       time: {node: from, field: proposed_at}
       is_event: false
       cardinality: {from: "1", to: "0..*"}
-      meaning: The finding belongs to this statement's reconciliation (this month).
+      meaning: >
+        The finding was raised in this statement's reconciliation (its month).
+        It stays linked to that month even while it is carried forward.
+
+    CLEARED_BY:
+      from: Finding
+      to: BankEntry
+      created_by: matching
+      time: {node: to, field: date}
+      is_event: false
+      cardinality: {from: "0..*", to: "0..1"}
+      planned: true   # needs a second month of data (a July fixture) to build and test
+      meaning: >
+        A timing difference from an earlier month has cleared: this bank line,
+        on a later statement, is the payment or receipt the finding was waiting
+        for. Each run starts by loading the findings still open from earlier
+        months and looking for their lines first. A finding with no CLEARED_BY
+        edge is still open, and gets older every month until a person acts.
