@@ -8,20 +8,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from firm_mapping import FIRM_MAPPING
+
 
 # Liquet's name : the name in the FIRM'S database
-ACCOUNT_FIELDS = {
-    "account_id" :"account_id",
-    "account_name" : "name",
-    "currency" : "currency",
-    "custodian" : "custodian",
-}
-
-# Liquet's name : the name in the FIRM'S database
-ACCOUNT_BALANCE_FIELDS = {
-    "as_of" : "as_of",
-    "balance" : "balance",
-}
+ACCOUNT_FIELDS = FIRM_MAPPING["accounts"]
+ACCOUNT_BALANCE_FIELDS = FIRM_MAPPING["account_balances"]
+PORTFOLIO_FIELDS = FIRM_MAPPING["portfolios"]
+CLIENT_FIELDS = FIRM_MAPPING["clients"]
 
 
 def load_json(path: Path) -> list[dict]:
@@ -67,16 +61,76 @@ def to_account_balances(raw_accounts: list[dict]) -> list[dict]:
             for liquet_field, firm_field in ACCOUNT_BALANCE_FIELDS.items():
                 if firm_field not in raw_balance:
                     raise ValueError(
-                        f"Account {account_id}, balance {index}: missing field {firm_field!r}"
-                    )
+                        f"Account {account_id}, balance {index}: missing field {firm_field!r}")
                 balance[liquet_field] = raw_balance[firm_field]
             balance["source"] = f"accounts/{account_id}/cash_balances/{index}"
             balances.append(balance)
     return balances
 
+def to_portfolios(raw_portfolios: list[dict]) -> list[dict]:
+    """Convert the portfolio details nested inside the firm's accounts to Liquet's
+    canonical `portfolios`: one flat list, one record per input."""
+    portfolios = []
+    for raw_portfolio in raw_portfolios:
+        portfolio_id = raw_portfolio.get("portfolio_id", "<unknown>")
+        portfolio = {}
+
+        client = raw_portfolio.get("client")
+        if not isinstance(client, dict) or "client_id" not in client:
+            raise ValueError(f"Portfolio {portfolio_id}: missing client or client_id")
+        portfolio["client_id"] = client["client_id"]
+
+        for liquet_field, firm_field in PORTFOLIO_FIELDS.items():
+            if firm_field not in raw_portfolio:
+                raise ValueError(f"Portfolio {portfolio_id}: missing field {firm_field!r}")
+            portfolio[liquet_field] = raw_portfolio[firm_field]
+        portfolio["source"] = f"portfolios/{portfolio_id}"
+        portfolios.append(portfolio)
+    return portfolios
+
+CLIENT_FIELDS = FIRM_MAPPING["clients"]
+
+
+def to_clients(raw_portfolios: list[dict]) -> list[dict]:
+    """Convert the clients embedded in the firm's portfolios to Liquet's
+    canonical `clients`: one record per client, even when a client owns
+    several portfolios."""
+    clients_by_id = {}   # client_id -> (client, portfolio it was first read from)
+    for raw_portfolio in raw_portfolios:
+        portfolio_id = raw_portfolio.get("portfolio_id", "<unknown>")
+        raw_client = raw_portfolio.get("client")
+        if not isinstance(raw_client, dict):
+            raise ValueError(f"Portfolio {portfolio_id}: missing or invalid 'client'")
+
+        client = {}
+        for liquet_field, firm_field in CLIENT_FIELDS.items():
+            if firm_field not in raw_client:
+                raise ValueError(
+                    f"Portfolio {portfolio_id}, client: missing field {firm_field!r}")
+            client[liquet_field] = raw_client[firm_field]
+
+        client_id = client["client_id"]
+        if client_id in clients_by_id:
+            first, first_portfolio = clients_by_id[client_id]
+            if first != client:
+                raise ValueError(
+                    f"Client {client_id}: details differ between portfolios "
+                    f"{first_portfolio} and {portfolio_id}")
+            continue   # same client, already recorded
+
+        clients_by_id[client_id] = (client, portfolio_id)
+
+    clients = []
+    for client, portfolio_id in clients_by_id.values():
+        client["source"] = f"portfolios/{portfolio_id}/client"
+        clients.append(client)
+    return clients
 
 
 if __name__ == "__main__":
     raw_accounts = load_json(Path("tests/fixtures/2026-06/firm/accounts.json"))
+    raw_portfolios = load_json(Path("tests/fixtures/2026-06/firm/portfolios.json"))
     print(to_accounts(raw_accounts))
     print(to_account_balances(raw_accounts))
+    print(to_portfolios(raw_portfolios))
+    print(to_clients(raw_portfolios))

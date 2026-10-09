@@ -5,6 +5,7 @@ import pytest
 import firm_connector
 
 ACCOUNT_LIST = Path(__file__).parent / "fixtures" / "2026-06" / "firm" / "accounts.json"
+PORTFOLIO_LIST = Path(__file__).parent / "fixtures" / "2026-06" / "firm" / "portfolios.json"
 
 
 # ---------------- load_json ----------------
@@ -65,11 +66,35 @@ def test_account_balances_are_read_correctly():
     ]
 
 
+def test_portfolios_are_read_correctly():
+    portfolios = firm_connector.to_portfolios(firm_connector.load_json(PORTFOLIO_LIST))
+    assert portfolios == [
+        {"portfolio_id": f"PF-CL-00{n}",
+         "account_id": "ACC-KRW-CASH-01",
+         "client_id": f"CL-00{n}", 
+         "source": f"portfolios/PF-CL-00{n}"}
+        for n in range(1, 6)
+    ]
+
+def test_clients_are_read_correctly():
+    clients = firm_connector.to_clients(firm_connector.load_json(PORTFOLIO_LIST))
+    assert clients == [
+    {"client_id": "CL-001", "name": "Amelia Hart",       "client_type": "individual", "source": "portfolios/PF-CL-001/client"},
+    {"client_id": "CL-002", "name": "Daniel Okoro",      "client_type": "individual", "source": "portfolios/PF-CL-002/client"},
+    {"client_id": "CL-003", "name": "Priya Nair",        "client_type": "individual", "source": "portfolios/PF-CL-003/client"},
+    {"client_id": "CL-004", "name": "Thomas Reid",       "client_type": "individual", "source": "portfolios/PF-CL-004/client"},
+    {"client_id": "CL-005", "name": "Hart Family Trust", "client_type": "trust",      "source": "portfolios/PF-CL-005/client"},
+]
+
+
+
 # ---------------- boundaries ----------------
 
 def test_empty_input_gives_empty_lists():
     assert firm_connector.to_accounts([]) == []
     assert firm_connector.to_account_balances([]) == []
+    assert firm_connector.to_portfolios([]) == []
+    assert firm_connector.to_clients([]) == []
 
 
 def test_account_with_no_balances_gives_empty_list():
@@ -83,6 +108,10 @@ def test_account_without_cash_balances_key_gives_empty_list():
     raw_account = {"account_id": "X1"}
     assert firm_connector.to_account_balances([raw_account]) == []
 
+def test_portfolio_without_client_raises():
+    raw_portfolio = {"portfolio_id": "P1"}
+    with pytest.raises(ValueError, match="missing or invalid 'client'"):
+        firm_connector.to_clients([raw_portfolio])
 
 # ---------------- silent wrong ----------------
 
@@ -114,7 +143,49 @@ def test_balances_keep_their_own_account_and_index():
     ]
 
 
+def _raw_portfolio(portfolio_id, client_id, full_name="Some Name"):
+    return {
+        "portfolio_id": portfolio_id,
+        "custody_account": "ACC-1",
+        "client": {"client_id": client_id, "full_name": full_name, "type": "individual"},
+    }
+
+
+def test_portfolios_keep_their_own_client_id():
+    # Catches every portfolio taking the first portfolio's client_id.
+    raw_portfolios = [_raw_portfolio("P1", "C1"), _raw_portfolio("P2", "C2")]
+    portfolios = firm_connector.to_portfolios(raw_portfolios)
+    assert [p["client_id"] for p in portfolios] == ["C1", "C2"]
+
+
+def test_same_client_in_two_portfolios_gives_one_record():
+    raw_portfolios = [
+        _raw_portfolio("P1", "C1", "Amelia Hart"),
+        _raw_portfolio("P2", "C1", "Amelia Hart"),
+    ]
+    assert firm_connector.to_clients(raw_portfolios) == [
+        {"client_id": "C1", "name": "Amelia Hart", "client_type": "individual",
+         "source": "portfolios/P1/client"},
+    ]
+
+
+def test_same_client_id_with_different_details_raises():
+    raw_portfolios = [
+        _raw_portfolio("P1", "C1", "Amelia Hart"),
+        _raw_portfolio("P2", "C1", "Amelia Hartley"),
+    ]
+    with pytest.raises(ValueError, match="details differ"):
+        firm_connector.to_clients(raw_portfolios)
+
+
 # ---------------- bad input ----------------
+
+@pytest.mark.parametrize("missing", ["portfolio_id", "custody_account"])
+def test_portfolio_missing_field_raises(missing):
+    raw = _raw_portfolio("P1", "C1")
+    del raw[missing]
+    with pytest.raises(ValueError, match=missing):
+        firm_connector.to_portfolios([raw])
 
 @pytest.mark.parametrize("missing", ["account_id", "name", "currency", "custodian"])
 def test_account_missing_field_raises(missing):
@@ -132,3 +203,15 @@ def test_balance_missing_field_raises(missing):
     with pytest.raises(ValueError, match=missing):
         firm_connector.to_account_balances([raw_account])
 
+@pytest.mark.parametrize("missing", ["client_id", "full_name", "type"])
+def test_client_missing_field_raises(missing):
+    raw = _raw_portfolio("P1", "C1")
+    del raw["client"][missing]
+    with pytest.raises(ValueError, match=missing):
+        firm_connector.to_clients([raw])
+
+def test_portfolio_without_client_raises_in_to_portfolios():
+    raw = _raw_portfolio("P1", "C1")
+    del raw["client"]
+    with pytest.raises(ValueError, match="missing client"):
+        firm_connector.to_portfolios([raw])
