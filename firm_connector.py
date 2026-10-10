@@ -1,8 +1,10 @@
 """Read the firm's data and return it in Liquet's canonical shape.
 
-Done so far: accounts, recorded balances, portfolios, clients and the cash book.
-Field names come from firm_mapping.py; _map_fields does the renaming and the
-missing-field checks for every collection.
+Done so far: accounts, recorded balances, portfolios, clients, the cash book,
+trades and securities.
+Where each field comes from is written in firm_mapping.py as a path, for
+example "accounts[*].cash_balances[*].balance". This file follows those
+paths and applies Liquet's own rules; it never names a firm field itself.
 """
 
 from __future__ import annotations
@@ -10,26 +12,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from firm_mapping import FIRM_MAPPING
+from firm_mapping import FIRM_DIRECTION_CODES, FIRM_MAPPING, FIRM_RECORD_IDS
 
-
-# Liquet's name : the name in the FIRM'S database
-ACCOUNT_FIELDS = FIRM_MAPPING["accounts"]
-ACCOUNT_BALANCE_FIELDS = FIRM_MAPPING["account_balances"]
-PORTFOLIO_FIELDS = FIRM_MAPPING["portfolios"]
-CLIENT_FIELDS = FIRM_MAPPING["clients"]
-CASH_BOOK_FIELDS = FIRM_MAPPING["cash_book"]
-
-
-def _map_fields(raw: dict, fields: dict, where: str, also_required: tuple = ()) -> dict:
-    """Copy fields from one firm record into a new dict with Liquet's names.
-
-    Stops with a clear error if any mapped field, or any field in
-    also_required (needed by the caller's own logic), is missing."""
-    for firm_field in [*fields.values(), *also_required]:
-        if firm_field not in raw:
-            raise ValueError(f"{where}: missing field {firm_field!r}")
-    return {liquet_field: raw[firm_field] for liquet_field, firm_field in fields.items()}
+UNKNOWN = "<unknown>"
 
 
 def load_json(path: Path) -> list[dict]:
@@ -49,126 +34,182 @@ def load_json(path: Path) -> list[dict]:
     return json_data
 
 
+# ---------------- following the paths in firm_mapping.py ----------------
+
+def _parse(path: str) -> tuple[list[tuple[str, bool, bool]], bool]:
+    """Split a path into steps of (name, is_list, skip_if_missing).
+
+    'a[*].b?.c?' -> ([('a', True, False), ('b', False, True), ('c', False, False)],
+                     optional=True)
+    A '?' at the very end makes the field optional; a '?' on an earlier step
+    means "only items that have this object; skip the others"."""
+    optional = path.endswith("?")
+    if optional:
+        path = path[:-1]
+    steps = []
+    for part in path.split("."):
+        if part.endswith("[*]"):
+            steps.append((part[:-3], True, False))
+        elif part.endswith("?"):
+            steps.append((part[:-1], False, True))
+        else:
+            steps.append((part, False, False))
+    return steps, optional
+
+
+def _depth(steps) -> int:
+    """How many lists ([*]) a path goes through."""
+    return sum(1 for _, is_list, _ in steps if is_list)
+
+
+def _record_steps(parsed: dict) -> list[tuple[str, bool]]:
+    """Where one record sits: the part shared by the fields that go deepest."""
+    deepest = max(_depth(steps) for steps, _ in parsed.values())
+    parents = [steps[:-1] for steps, _ in parsed.values() if _depth(steps) == deepest]
+    common = parents[0]
+    for other in parents[1:]:
+        n = 0
+        while n < min(len(common), len(other)) and common[n] == other[n]:
+            n += 1
+        common = common[:n]
+    return common
+
+
+def _walk(datasets: dict, steps: list, levels: list, node, source: str):
+    """Yield (items at each list level, source) for every record under `steps`."""
+    if not steps:
+        yield levels, source
+        return
+    name, is_list, skip_if_missing = steps[0]
+    if is_list:
+        children = datasets[name] if not levels else node.get(name, [])
+        if not isinstance(children, list):
+            raise ValueError(f"{source}: {name!r} should be a list")
+        for index, child in enumerate(children):
+            if not levels:   # a top-level record: named by its id
+                record_id = child.get(FIRM_RECORD_IDS[name]) if isinstance(child, dict) else None
+                child_source = f"{name}/{UNKNOWN if record_id is None else record_id}"
+            else:            # a nested record: named by its position
+                child_source = f"{source}/{name}/{index}"
+            yield from _walk(datasets, steps[1:], levels + [child], child, child_source)
+    else:
+        child = node.get(name) if isinstance(node, dict) else None
+        if not isinstance(child, dict):
+            if skip_if_missing:
+                return   # e.g. a movement with no trade: not a trade record
+            raise ValueError(f"{source}: missing or invalid {name!r}")
+        yield from _walk(datasets, steps[1:], levels, child, f"{source}/{name}")
+
+
+def _read_field(levels: list, steps: list, optional: bool, source: str):
+    """Read one field: start at the item of its deepest list, then follow the rest."""
+    depth = _depth(steps)
+    value = levels[depth - 1]
+    rest = steps[[i for i, (_, is_list, _) in enumerate(steps) if is_list][depth - 1] + 1:]
+    for name, *_ in rest:
+        if not isinstance(value, dict) or name not in value:
+            if optional:
+                return None
+            raise ValueError(f"{source}: missing field {'.'.join(n for n, *_ in rest)!r}")
+        value = value[name]
+    return value
+
+
+def _extract(datasets: dict, block: dict) -> list[dict]:
+    """Build one Liquet record per item of the deepest list in `block`."""
+    parsed = {liquet: _parse(path) for liquet, path in block.items() if path is not None}
+    constants = [liquet for liquet, path in block.items() if path is None]
+    records = []
+    for levels, source in _walk(datasets, _record_steps(parsed), [], None, ""):
+        record = {liquet: _read_field(levels, steps, optional, source)
+                  for liquet, (steps, optional) in parsed.items()}
+        record |= {liquet: None for liquet in constants}
+        record["source"] = source
+        records.append(record)
+    return records
+
+
+# ---------------- one function per canonical collection ----------------
+
 def to_accounts(raw_accounts: list[dict]) -> list[dict]:
-    """Convert the firm's account data to Liquet's canonical shape."""
-    accounts = []
-    for raw_account in raw_accounts:
-        account_id = raw_account.get("account_id", "<unknown>")
-        account = _map_fields(raw_account, ACCOUNT_FIELDS, f"Account {account_id}")
-        account["source"] = f"accounts/{account_id}"
-        accounts.append(account)
-    return accounts
+    """Convert the firm's accounts to Liquet's canonical `accounts`."""
+    return _extract({"accounts": raw_accounts}, FIRM_MAPPING["accounts"])
 
 
 def to_account_balances(raw_accounts: list[dict]) -> list[dict]:
-    """Convert the balances nested inside the firm's accounts to Liquet's
-    canonical `account_balances`: one flat list, one record per balance."""
-    balances = []
-    for raw_account in raw_accounts:
-        account_id = raw_account.get("account_id", "<unknown>")
-        for index, raw_balance in enumerate(raw_account.get("cash_balances", [])):
-            balance = {"account_id": account_id}
-            balance |= _map_fields(raw_balance, ACCOUNT_BALANCE_FIELDS,
-                                   f"Account {account_id}, balance {index}")
-            balance["source"] = f"accounts/{account_id}/cash_balances/{index}"
-            balances.append(balance)
-    return balances
+    """Convert the balances inside the firm's accounts to Liquet's canonical
+    `account_balances`: one record per balance, with its account's id."""
+    return _extract({"accounts": raw_accounts}, FIRM_MAPPING["account_balances"])
+
 
 def to_portfolios(raw_portfolios: list[dict]) -> list[dict]:
-    """Convert the firm's portfolios to Liquet's canonical `portfolios`, one
-    record per portfolio, with the owner's client_id taken from the embedded client."""
-    portfolios = []
-    for raw_portfolio in raw_portfolios:
-        portfolio_id = raw_portfolio.get("portfolio_id", "<unknown>")
-        portfolio = {}
+    """Convert the firm's portfolios to Liquet's canonical `portfolios`."""
+    return _extract({"portfolios": raw_portfolios}, FIRM_MAPPING["portfolios"])
 
-        client = raw_portfolio.get("client")
-        if not isinstance(client, dict) or "client_id" not in client:
-            raise ValueError(f"Portfolio {portfolio_id}: missing client or client_id")
-        portfolio["client_id"] = client["client_id"]
 
-        portfolio |= _map_fields(raw_portfolio, PORTFOLIO_FIELDS, f"Portfolio {portfolio_id}")
-        portfolio["source"] = f"portfolios/{portfolio_id}"
-        portfolios.append(portfolio)
-    return portfolios
+def to_trades(raw_portfolios: list[dict]) -> list[dict]:
+    """Convert the trades inside the firm's trade-settlement movements to
+    Liquet's canonical `trades`: one record per movement that has a trade."""
+    return _extract({"portfolios": raw_portfolios}, FIRM_MAPPING["trades"])
+
+
+def _one_per_id(records: list[dict], id_field: str, what: str) -> list[dict]:
+    """Keep one record per id when the firm copies the same thing into several
+    places (a client in each portfolio, a security in each trade).
+
+    Copies must agree; if two differ, stop and name both places. Liquet never
+    silently picks one (canonical check 7). The first copy's `source` is kept."""
+    by_id = {}
+    for record in records:
+        details = {k: v for k, v in record.items() if k != "source"}
+        record_id = record[id_field]
+        if record_id in by_id:
+            first = by_id[record_id]
+            if {k: v for k, v in first.items() if k != "source"} != details:
+                raise ValueError(
+                    f"{what} {record_id}: details differ between {first['source']} "
+                    f"and {record['source']}")
+            continue   # same thing, already recorded
+        by_id[record_id] = record
+    return list(by_id.values())
 
 
 def to_clients(raw_portfolios: list[dict]) -> list[dict]:
     """Convert the clients embedded in the firm's portfolios to Liquet's
     canonical `clients`: one record per client, even when a client owns
     several portfolios."""
-    clients_by_id = {}   # client_id -> (client, portfolio it was first read from)
-    for raw_portfolio in raw_portfolios:
-        portfolio_id = raw_portfolio.get("portfolio_id", "<unknown>")
-        raw_client = raw_portfolio.get("client")
-        if not isinstance(raw_client, dict):
-            raise ValueError(f"Portfolio {portfolio_id}: missing or invalid 'client'")
-
-        client = _map_fields(raw_client, CLIENT_FIELDS, f"Portfolio {portfolio_id}, client")
-
-        client_id = client["client_id"]
-        if client_id in clients_by_id:
-            first, first_portfolio = clients_by_id[client_id]
-            if first != client:
-                raise ValueError(
-                    f"Client {client_id}: details differ between portfolios "
-                    f"{first_portfolio} and {portfolio_id}")
-            continue   # same client, already recorded
-
-        clients_by_id[client_id] = (client, portfolio_id)
-
-    clients = []
-    for client, portfolio_id in clients_by_id.values():
-        client["source"] = f"portfolios/{portfolio_id}/client"
-        clients.append(client)
-    return clients
+    clients = _extract({"portfolios": raw_portfolios}, FIRM_MAPPING["clients"])
+    return _one_per_id(clients, "client_id", "Client")
 
 
-def _to_cash_entry(raw_movement: dict, account_id: str, portfolio_id: str | None, source: str) -> dict:
-    """Convert one firm movement to one canonical cash_book entry."""
-    entry_id = raw_movement.get("movement_id", "<unknown>")
-    entry = _map_fields(raw_movement, CASH_BOOK_FIELDS, f"Cash movement {entry_id} ({source})",
-                        also_required=("direction", "amount"))
-    
-    # fields added in code,because they are not present in the firm's cash_movement list data:
-    entry["account_id"] = account_id
-    entry["portfolio_id"] = portfolio_id
-
-    trade = raw_movement.get("trade")
-    entry["trade_id"] = trade["trade_ref"] if trade else None
-
-    dividend = raw_movement.get("dividend")
-    entry["ticker"] = dividend["security"]["ticker"] if dividend else None
-
-    direction = raw_movement["direction"]
-    if direction == "IN":
-        entry["debit"], entry["credit"] = raw_movement["amount"], None
-    elif direction == "OUT":
-        entry["debit"], entry["credit"] = None, raw_movement["amount"]
-    else:
-        raise ValueError(f"Cash movement {entry_id}: direction must be IN or OUT, got {direction!r}")
-
-    entry["source"] = source
-    return entry
+def to_securities(raw_portfolios: list[dict]) -> list[dict]:
+    """Convert the securities copied inside the firm's trades and dividends to
+    Liquet's canonical `securities`: one record per ticker."""
+    copies = []
+    for block in FIRM_MAPPING["securities"]:
+        copies += _extract({"portfolios": raw_portfolios}, block)
+    return _one_per_id(copies, "ticker", "Security")
 
 
 def to_cash_book(raw_accounts: list[dict], raw_portfolios: list[dict]) -> list[dict]:
     """Convert the firm's cash movements to Liquet's canonical `cash_book`:
     client movements from each portfolio, then account movements (fees,
-    interest) that belong to no client."""
+    interest) that belong to no client. The firm's direction code decides
+    whether the amount is a debit (money in) or a credit (money out)."""
+    datasets = {"accounts": raw_accounts, "portfolios": raw_portfolios}
     entries = []
-    for portfolio in raw_portfolios:
-        portfolio_id = portfolio.get("portfolio_id", "<unknown>")
-        account_id = portfolio.get("custody_account", "<unknown>")
-        for index, movement in enumerate(portfolio.get("cash_movements", [])):
-            source = f"portfolios/{portfolio_id}/cash_movements/{index}"
-            entries.append(_to_cash_entry(movement, account_id, portfolio_id, source))
-
-    for account in raw_accounts:
-        account_id = account.get("account_id", "<unknown>")
-        for index, movement in enumerate(account.get("account_movements", [])):
-            source = f"accounts/{account_id}/account_movements/{index}"
-            entries.append(_to_cash_entry(movement, account_id, None, source))
+    for block in FIRM_MAPPING["cash_book"]:
+        for entry in _extract(datasets, block):
+            direction = entry.pop("direction")
+            amount = entry.pop("amount")
+            column = FIRM_DIRECTION_CODES.get(direction)
+            if column is None:
+                raise ValueError(
+                    f"{entry['source']}: direction must be "
+                    f"{' or '.join(FIRM_DIRECTION_CODES)}, got {direction!r}")
+            entry["debit"] = amount if column == "debit" else None
+            entry["credit"] = amount if column == "credit" else None
+            entries.append(entry)
     return entries
 
 
@@ -182,3 +223,6 @@ if __name__ == "__main__":
     cash_book = to_cash_book(raw_accounts, raw_portfolios)
     print(len(cash_book))   # expect 17
     print(cash_book[1])     # CE-2026-06-0002: trade_id TR-26060101, credit 4852.40
+    trades = to_trades(raw_portfolios)
+    print(len(trades))      # expect 5
+    print(to_securities(raw_portfolios))   # expect ALBN, THIX, SEVN, ATIT

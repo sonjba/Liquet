@@ -267,7 +267,7 @@ def test_client_missing_field_raises(missing):
 def test_portfolio_without_client_raises_in_to_portfolios():
     raw = _raw_portfolio("P1", "C1")
     del raw["client"]
-    with pytest.raises(ValueError, match="missing client"):
+    with pytest.raises(ValueError, match="client.client_id"):
         firm_connector.to_portfolios([raw])
 
 def test_unknown_direction_raises():
@@ -286,3 +286,176 @@ def test_movement_missing_field_raises(missing):
     portfolio["cash_movements"] = [movement]
     with pytest.raises(ValueError, match=missing):
         firm_connector.to_cash_book([], [portfolio])
+
+
+# ---------------- the path engine (_extract) ----------------
+# These call _extract directly with small made-up mappings, so they test the
+# path rules themselves, not the firm's mapping.
+
+def test_optional_field_missing_gives_none():
+    data = {"accounts": [{"account_id": "A1"}]}
+    block = {"account_id": "accounts[*].account_id",
+             "nickname": "accounts[*].details.nickname?"}
+    assert firm_connector._extract(data, block) == [
+        {"account_id": "A1", "nickname": None, "source": "accounts/A1"},
+    ]
+
+
+def test_required_field_missing_raises():
+    data = {"accounts": [{"account_id": "A1"}]}
+    block = {"account_id": "accounts[*].account_id",
+             "nickname": "accounts[*].details.nickname"}
+    with pytest.raises(ValueError, match="details.nickname"):
+        firm_connector._extract(data, block)
+
+
+def test_list_path_that_is_not_a_list_raises():
+    data = {"accounts": [{"account_id": "A1", "cash_balances": {"as_of": "2026-05-31"}}]}
+    block = {"as_of": "accounts[*].cash_balances[*].as_of"}
+    with pytest.raises(ValueError, match="should be a list"):
+        firm_connector._extract(data, block)
+
+
+def test_three_levels_give_one_record_per_deepest_item():
+    # 1 account -> 2 groups -> 2 + 1 items = 3 records, each with its parents' values.
+    data = {"accounts": [{
+        "account_id": "A1",
+        "groups": [
+            {"group": "G1", "items": [{"x": 1}, {"x": 2}]},
+            {"group": "G2", "items": [{"x": 3}]},
+        ],
+    }]}
+    block = {"account_id": "accounts[*].account_id",
+             "group":      "accounts[*].groups[*].group",
+             "x":          "accounts[*].groups[*].items[*].x"}
+    assert firm_connector._extract(data, block) == [
+        {"account_id": "A1", "group": "G1", "x": 1, "source": "accounts/A1/groups/0/items/0"},
+        {"account_id": "A1", "group": "G1", "x": 2, "source": "accounts/A1/groups/0/items/1"},
+        {"account_id": "A1", "group": "G2", "x": 3, "source": "accounts/A1/groups/1/items/0"},
+    ]
+
+
+def test_none_in_mapping_gives_none():
+    data = {"accounts": [{"account_id": "A1"}]}
+    block = {"account_id": "accounts[*].account_id", "portfolio_id": None}
+    assert firm_connector._extract(data, block)[0]["portfolio_id"] is None
+
+
+# ---------------- trades ----------------
+
+PORTFOLIOS = PORTFOLIO_LIST   # same fixture, clearer name in these tests
+
+
+def test_trades_one_per_trade_settlement():
+    # 16 June movements, 5 of them trade settlements.
+    assert len(firm_connector.to_trades(firm_connector.load_json(PORTFOLIOS))) == 5
+
+
+def test_trade_is_read_correctly():
+    trades = {t["trade_id"]: t for t in firm_connector.to_trades(firm_connector.load_json(PORTFOLIOS))}
+    # The ALBN buy agreed 29 June that settles 1 July (B2 in the answer key).
+    assert trades["TR-26062901"] == {
+        "trade_id": "TR-26062901", "portfolio_id": "PF-CL-001", "account_id": "ACC-KRW-CASH-01",
+        "ticker": "ALBN", "side": "BUY", "trade_date": "2026-06-29", "settlement_date": "2026-07-01",
+        "quantity": 300, "price": "12.35", "costs": "12.00", "settlement_amount": "3717.00",
+        "source": "portfolios/PF-CL-001/cash_movements/2/trade",
+    }
+
+
+def _raw_trade():
+    return {"trade_ref": "T1", "side": "BUY", "trade_date": "2026-06-01",
+            "settle_date": "2026-06-03", "qty": 10, "unit_price": "1.00",
+            "fees": "0.50", "consideration": "10.50", "security": {"ticker": "XYZ"}}
+
+
+@pytest.mark.parametrize("missing", ["trade_ref", "side", "trade_date", "settle_date",
+                                     "qty", "unit_price", "fees", "consideration"])
+def test_trade_missing_field_raises(missing):
+    trade = _raw_trade()
+    del trade[missing]
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [_raw_movement(trade=trade)]
+    with pytest.raises(ValueError, match=missing):
+        firm_connector.to_trades([portfolio])
+
+
+def test_no_trades_gives_empty_list():
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [_raw_movement()]   # a subscription, no trade
+    assert firm_connector.to_trades([portfolio]) == []
+
+
+# ---------------- the path engine: "b?" skips items without b ----------------
+
+def test_optional_step_skips_items_without_it():
+    data = {"accounts": [{"account_id": "A1", "items": [
+        {"extra": {"x": 1}},
+        {},                     # no "extra": skipped, not an error
+        {"extra": {"x": 3}},
+    ]}]}
+    block = {"x": "accounts[*].items[*].extra?.x"}
+    assert firm_connector._extract(data, block) == [
+        {"x": 1, "source": "accounts/A1/items/0/extra"},
+        {"x": 3, "source": "accounts/A1/items/2/extra"},
+    ]
+
+
+# ---------------- securities ----------------
+
+def test_securities_one_per_ticker():
+    # ALBN appears in three trades; it must come out once.
+    securities = firm_connector.to_securities(firm_connector.load_json(PORTFOLIO_LIST))
+    assert securities == [
+        {"ticker": "ALBN", "name": "Albion Utilities plc", "security_type": "share",
+         "domicile": "uk", "source": "portfolios/PF-CL-001/cash_movements/1/trade/security"},
+        {"ticker": "THIX", "name": "Thames Index Fund", "security_type": "fund",
+         "domicile": "uk", "source": "portfolios/PF-CL-002/cash_movements/0/trade/security"},
+        {"ticker": "SEVN", "name": "Severn Pharma plc", "security_type": "share",
+         "domicile": "uk", "source": "portfolios/PF-CL-003/cash_movements/0/trade/security"},
+        {"ticker": "ATIT", "name": "Atlantic Income Trust", "security_type": "fund",
+         "domicile": "overseas", "source": "portfolios/PF-CL-004/cash_movements/0/dividend/security"},
+    ]
+
+
+def _security(name="Xyz plc", domicile="uk"):
+    return {"ticker": "XYZ", "name": name, "type": "share", "domicile": domicile}
+
+
+def test_same_security_in_trade_and_dividend_gives_one_record():
+    trade = _raw_trade()
+    trade["security"] = _security()
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [
+        _raw_movement("M1", trade=trade),
+        _raw_movement("M2", dividend={"security": _security()}),
+    ]
+    assert [s["ticker"] for s in firm_connector.to_securities([portfolio])] == ["XYZ"]
+
+
+def test_security_copies_that_disagree_raise():
+    # Silent wrong otherwise: the domicile decides whether a dividend is taxed.
+    trade = _raw_trade()
+    trade["security"] = _security(domicile="uk")
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [
+        _raw_movement("M1", trade=trade),
+        _raw_movement("M2", dividend={"security": _security(domicile="overseas")}),
+    ]
+    with pytest.raises(ValueError, match="Security XYZ: details differ"):
+        firm_connector.to_securities([portfolio])
+
+
+@pytest.mark.parametrize("missing", ["ticker", "name", "type", "domicile"])
+def test_security_missing_field_raises(missing):
+    security = _security()
+    del security[missing]
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [_raw_movement(dividend={"security": security})]
+    with pytest.raises(ValueError, match=missing):
+        firm_connector.to_securities([portfolio])
+
+
+def test_no_trades_or_dividends_gives_no_securities():
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [_raw_movement()]
+    assert firm_connector.to_securities([portfolio]) == []
