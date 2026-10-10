@@ -1,0 +1,442 @@
+{
+  "accounts": [
+    {
+      "account_id": "ACC-KRW-CASH-01",
+      "account_name": "Client cash account",
+      "custodian": "Northgate Custody Bank",
+      "currency": "GBP",
+      "source": "accounts/ACC-KRW-CASH-01"
+    }
+  ],
+  "account_balances": [
+    {
+      "account_id": "ACC-KRW-CASH-01",
+      "as_of": "2026-05-31",
+      "balance": "250000.00",
+      "source": "accounts/ACC-KRW-CASH-01/cash_balances/0"
+    }
+  ],
+  "clients": [
+    {
+      "client_id": "CL-001",
+      "name": "Amelia Hart",
+      "client_type": "individual",
+      "source": "portfolios/PF-CL-001/client"
+    },
+    {
+      "client_id": "CL-002",
+      "name": "Daniel Okoro",
+      "client_type": "individual",
+      "source": "portfolios/PF-CL-002/client"
+    },
+    {
+      "client_id": "CL-003",
+      "name": "Priya Nair",
+      "client_type": "individual",
+      "source": "portfolios/PF-CL-003/client"
+    },
+    {
+      "client_id": "CL-004",
+      "name": "Thomas Reid",
+      "client_type": "individual",
+      "source": "portfolios/PF-CL-004/client"
+    },
+    {
+      "client_id": "CL-005",
+      "name": "Hart Family Trust",
+      "client_type": "trust",
+      "source": "portfolios/PF-CL-005/client"
+    }
+  ],
+  "portfolios": [
+    {
+      "portfolio_id": "PF-CL-001",
+      "account_id": "ACC-KRW-CASH-01",
+      "client_id": "CL-001",
+      "source": "portfolios/PF-CL-001"
+    },
+    {
+      "portfolio_id": "PF-CL-002",
+      "account_id": "ACC-KRW-CASH-01",
+      "client_id": "CL-002",
+      "source": "portfolios/PF-CL-002"
+    },
+    {
+      "portfolio_id": "PF-CL-003",
+      "account_id": "ACC-KRW-CASH-01",
+      "client_id": "CL-003",
+      "source": "portfolios/PF-CL-003"
+    },
+    {
+      "portfolio_id": "PF-CL-004",
+      "account_id": "ACC-KRW-CASH-01",
+      "client_id": "CL-004",
+      "source": "portfolios/PF-CL-004"
+    },
+    {
+      "portfolio_id": "PF-CL-005",
+      "account_id": "ACC-KRW-CASH-01",
+      "client_id": "CL-005",
+      "source": "portfolios/PF-CL-005"
+    }
+  ],
+  "securities": [
+    {
+      "ticker": "ALBN",
+      "name": "Albion Utilities plc",
+      "security_type": "share",
+      "domicile": "uk",
+      "source": "portfolios/PF-CL-001/cash_movements/1/trade/security"
+    },
+    {
+      "ticker": "THIX",
+      "name": "Thames Index Fund",
+      "security_type": "fund",
+      "domicile": "uk",
+      "source": "portfolios/PF-CL-002/cash_movements/0/trade/security"
+    },
+    {
+      "ticker": "SEVN",
+      "name": "Severn Pharma plc",
+      "security_type": "share",
+      "domicile": "uk",
+      "source": "portfolios/PF-CL-003/cash_movements/0/trade/security"
+    },
+    {
+      "ticker": "ATIT",
+      "name": "Atlantic Income Trust",
+      "security_type": "fund",
+      "domicile": "overseas",
+      "source": "portfolios/PF-CL-004/cash_movements/0/dividend/security"
+    }
+  ],
+  "trades": [
+    {
+      "trade_id": "TR-26060101",
+      "portfolio_id": "PF-CL-001",
+      "account_id": "ACC-KRW-CASH-01",
+      "ticker": "ALBN",
+      "side": "BUY",
+      "trade_date": "2026-06-01",
+      "settlement_date": "2026-06-03",
+      "quantity": 400,
+      "price": "12.10",
+      "costs": "12.40",
+      "settlement_amount": "4852.40",
+      "source": "portfolios/PF-CL-001/cash_movements/1/trade"
+    },
+    {
+      "trade_id": "TR-26062901",
+      "portfolio_id": "PF-CL-001",
+      "account_id": "ACC-KRW-CASH-01",
+      "ticker": "ALBN",
+      "side": "BUY",
+      "trade_date": "2026-06-29",
+      "settlement_date": "2026-07-01",
+      "quantity": 300,
+      "price": "12.35",
+      "costs": "12.00",
+      "settlement_amount": "3717.00",
+      "source": "portfolios/PF-CL-001/cash_movements/2/trade"
+    },
+    {
+      "trade_id": "TR-26061101",
+      "portfolio_id": "PF-CL-002",
+      "account_id": "ACC-KRW-CASH-01",
+      "ticker": "THIX",
+      "side": "BUY",
+      "trade_date": "2026-06-11",
+      "settlement_date": "2026-06-15",
+      "quantity": 1000,
+      "price": "8.25",
+      "costs": "12.00",
+      "settlement_amount": "8262.00",
+      "source": "portfolios/PF-CL-002/cash_movements/0/trade"
+    },
+    {
+      "trade_id": "TR-26060302",
+      "portfolio_id": "PF-CL-003",
+      "account_id": "ACC-KRW-CASH-01",
+      "ticker": "SEVN",
+      "side": "SELL",
+      "trade_date": "2026-06-03",
+      "settlement_date": "2026-06-05",
+      "quantity": 250,
+      "price": "24.80",
+      "costs": "12.50",
+      "settlement_amount": "6187.50",
+      "source": "portfolios/PF-CL-003/cash_movements/0/trade"
+    },
+    {
+      "trade_id": "TR-26062401",
+      "portfolio_id": "PF-CL-005",
+      "account_id": "ACC-KRW-CASH-01",
+      "ticker": "ALBN",
+      "side": "SELL",
+      "trade_date": "2026-06-24",
+      "settlement_date": "2026-06-26",
+      "quantity": 600,
+      "price": "12.40",
+      "costs": "14.40",
+      "settlement_amount": "7425.60",
+      "source": "portfolios/PF-CL-005/cash_movements/1/trade"
+    }
+  ],
+  "cash_book": [
+    {
+      "entry_id": "CE-2026-06-0001",
+      "date": "2026-06-01",
+      "recorded_at": "2026-06-01",
+      "entry_type": "SUBSCRIPTION",
+      "description": "Subscription Amelia Hart",
+      "reference": "CL-001-SUB-0601",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-001",
+      "source": "portfolios/PF-CL-001/cash_movements/0",
+      "debit": "25000.00",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0002",
+      "date": "2026-06-01",
+      "recorded_at": "2026-06-01",
+      "entry_type": "TRADE_SETTLEMENT",
+      "description": "Buy 400 ALBN",
+      "reference": "TR-26060101",
+      "trade_id": "TR-26060101",
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-001",
+      "source": "portfolios/PF-CL-001/cash_movements/1",
+      "debit": null,
+      "credit": "4852.40"
+    },
+    {
+      "entry_id": "CE-2026-06-0011",
+      "date": "2026-06-29",
+      "recorded_at": "2026-06-29",
+      "entry_type": "TRADE_SETTLEMENT",
+      "description": "Buy 300 ALBN",
+      "reference": "TR-26062901",
+      "trade_id": "TR-26062901",
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-001",
+      "source": "portfolios/PF-CL-001/cash_movements/2",
+      "debit": null,
+      "credit": "3717.00"
+    },
+    {
+      "entry_id": "CE-2026-06-0012",
+      "date": "2026-06-30",
+      "recorded_at": "2026-06-30",
+      "entry_type": "MANAGEMENT_FEE",
+      "description": "Management fee June Amelia Hart",
+      "reference": "FEE-2026-06",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-001",
+      "source": "portfolios/PF-CL-001/cash_movements/3",
+      "debit": null,
+      "credit": "473.50"
+    },
+    {
+      "entry_id": "CE-2026-06-0006",
+      "date": "2026-06-11",
+      "recorded_at": "2026-06-11",
+      "entry_type": "TRADE_SETTLEMENT",
+      "description": "Buy 1000 THIX",
+      "reference": "TR-26061101",
+      "trade_id": "TR-26061101",
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-002",
+      "source": "portfolios/PF-CL-002/cash_movements/0",
+      "debit": null,
+      "credit": "8262.00"
+    },
+    {
+      "entry_id": "CE-2026-06-0009",
+      "date": "2026-06-22",
+      "recorded_at": "2026-06-22",
+      "entry_type": "SUBSCRIPTION",
+      "description": "Subscription Daniel Okoro",
+      "reference": "CL-002-SUB-0622",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-002",
+      "source": "portfolios/PF-CL-002/cash_movements/1",
+      "debit": "15000.00",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0013",
+      "date": "2026-06-30",
+      "recorded_at": "2026-06-30",
+      "entry_type": "MANAGEMENT_FEE",
+      "description": "Management fee June Daniel Okoro",
+      "reference": "FEE-2026-06",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-002",
+      "source": "portfolios/PF-CL-002/cash_movements/2",
+      "debit": null,
+      "credit": "312.50"
+    },
+    {
+      "entry_id": "CE-2026-06-0003",
+      "date": "2026-06-03",
+      "recorded_at": "2026-06-03",
+      "entry_type": "TRADE_SETTLEMENT",
+      "description": "Sell 250 SEVN",
+      "reference": "TR-26060302",
+      "trade_id": "TR-26060302",
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-003",
+      "source": "portfolios/PF-CL-003/cash_movements/0",
+      "debit": "6187.50",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0007",
+      "date": "2026-06-18",
+      "recorded_at": "2026-06-19",
+      "entry_type": "SUBSCRIPTION",
+      "description": "Top-up Priya Nair",
+      "reference": "CL-003-SUB-0618",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-003",
+      "source": "portfolios/PF-CL-003/cash_movements/1",
+      "debit": "5000.00",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0014",
+      "date": "2026-06-30",
+      "recorded_at": "2026-06-30",
+      "entry_type": "MANAGEMENT_FEE",
+      "description": "Management fee June Priya Nair",
+      "reference": "FEE-2026-06",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-003",
+      "source": "portfolios/PF-CL-003/cash_movements/2",
+      "debit": null,
+      "credit": "187.50"
+    },
+    {
+      "entry_id": "CE-2026-06-0004",
+      "date": "2026-06-10",
+      "recorded_at": "2026-06-10",
+      "entry_type": "DIVIDEND",
+      "description": "Dividend ATIT",
+      "reference": "DIV-ATIT-0610",
+      "trade_id": null,
+      "ticker": "ATIT",
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-004",
+      "source": "portfolios/PF-CL-004/cash_movements/0",
+      "debit": "1500.00",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0005",
+      "date": "2026-06-11",
+      "recorded_at": "2026-06-11",
+      "entry_type": "WITHDRAWAL",
+      "description": "Withdrawal Thomas Reid",
+      "reference": "CL-004-WD-0611",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-004",
+      "source": "portfolios/PF-CL-004/cash_movements/1",
+      "debit": null,
+      "credit": "10000.00"
+    },
+    {
+      "entry_id": "CE-2026-06-0015",
+      "date": "2026-06-30",
+      "recorded_at": "2026-06-30",
+      "entry_type": "MANAGEMENT_FEE",
+      "description": "Management fee June Thomas Reid",
+      "reference": "FEE-2026-06",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-004",
+      "source": "portfolios/PF-CL-004/cash_movements/2",
+      "debit": null,
+      "credit": "375.00"
+    },
+    {
+      "entry_id": "CE-2026-06-0008",
+      "date": "2026-06-19",
+      "recorded_at": "2026-06-19",
+      "entry_type": "SUBSCRIPTION",
+      "description": "Subscription Hart Family Trust",
+      "reference": "CL-005-SUB-0619",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-005",
+      "source": "portfolios/PF-CL-005/cash_movements/0",
+      "debit": "5000.00",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0010",
+      "date": "2026-06-24",
+      "recorded_at": "2026-06-24",
+      "entry_type": "TRADE_SETTLEMENT",
+      "description": "Sell 600 ALBN",
+      "reference": "TR-26062401",
+      "trade_id": "TR-26062401",
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-005",
+      "source": "portfolios/PF-CL-005/cash_movements/1",
+      "debit": "7425.60",
+      "credit": null
+    },
+    {
+      "entry_id": "CE-2026-06-0016",
+      "date": "2026-06-30",
+      "recorded_at": "2026-06-30",
+      "entry_type": "MANAGEMENT_FEE",
+      "description": "Management fee June Hart Family Trust",
+      "reference": "FEE-2026-06",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": "PF-CL-005",
+      "source": "portfolios/PF-CL-005/cash_movements/2",
+      "debit": null,
+      "credit": "250.00"
+    },
+    {
+      "entry_id": "CE-2026-05-0030",
+      "date": "2026-05-31",
+      "recorded_at": "2026-05-31",
+      "entry_type": "INTEREST",
+      "description": "Credit interest May",
+      "reference": "INT-2026-05",
+      "trade_id": null,
+      "ticker": null,
+      "account_id": "ACC-KRW-CASH-01",
+      "portfolio_id": null,
+      "source": "accounts/ACC-KRW-CASH-01/account_movements/0",
+      "debit": "198.44",
+      "credit": null
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 """Where each Liquet field comes from in the firm's data.
 
 One line per field:  Liquet name : path in the firm's data.
+path_mapper.py follows the paths (its docstring has the full rules).
 
 How to read a path:
   accounts[*].cash_balances[*].balance
@@ -9,13 +10,21 @@ How to read a path:
 
 Rules:
   [*]     for each item in this list
+  ?[*]    the same, but the list may be missing (then it has no items)
   a.b     field b inside the object in field a
-  ?       at the end: optional, None when it is not there
-  b?.c    "?" on an earlier step: only items that have object b; skip the others
+  name?   this part may be missing (not there, or null)
   None    instead of a path: the field is always None
+Everything without a ? must be there, or the connector stops.
 
 One record is made per item of the deepest list. A field with fewer [*]
 is read from the parent item, e.g. a balance's account_id comes from its account.
+
+When a part marked ? is missing:
+  - if all of the record's own fields go through it, the item is skipped
+    (trades: a movement without trade? is not a trade);
+  - otherwise only that field is None
+    (cash book: a movement without trade? gets trade_id None).
+  What comes after the ? is required: a trade without trade_ref is an error.
 """
 
 FIRM_MAPPING = {
@@ -72,6 +81,8 @@ FIRM_MAPPING = {
         },
     ],
     # The cash book comes from two places, so it has two blocks.
+    # Only some movements have a trade or a dividend: "trade?" and "dividend?"
+    # give None for the others. If one is there, the rest of its path must be too.
     "cash_book": [
         {   # client movements, inside each portfolio
             "entry_id":     "portfolios[*].cash_movements[*].movement_id",
@@ -82,8 +93,8 @@ FIRM_MAPPING = {
             "reference":    "portfolios[*].cash_movements[*].our_ref",
             "direction":    "portfolios[*].cash_movements[*].direction",
             "amount":       "portfolios[*].cash_movements[*].amount",
-            "trade_id":     "portfolios[*].cash_movements[*].trade.trade_ref?",
-            "ticker":       "portfolios[*].cash_movements[*].dividend.security.ticker?",
+            "trade_id":     "portfolios[*].cash_movements[*].trade?.trade_ref",
+            "ticker":       "portfolios[*].cash_movements[*].dividend?.security.ticker",
             "account_id":   "portfolios[*].custody_account",
             "portfolio_id": "portfolios[*].portfolio_id",
         },
@@ -96,15 +107,16 @@ FIRM_MAPPING = {
             "reference":    "accounts[*].account_movements[*].our_ref",
             "direction":    "accounts[*].account_movements[*].direction",
             "amount":       "accounts[*].account_movements[*].amount",
-            "trade_id":     "accounts[*].account_movements[*].trade.trade_ref?",
-            "ticker":       "accounts[*].account_movements[*].dividend.security.ticker?",
+            "trade_id":     "accounts[*].account_movements[*].trade?.trade_ref",
+            "ticker":       "accounts[*].account_movements[*].dividend?.security.ticker",
             "account_id":   "accounts[*].account_id",
             "portfolio_id": None,      # account movements belong to no portfolio
         },
     ],
 }
 
-# The firm's id field for each top-level dataset; used in `source`.
+# The firm's top-level datasets, and the id field that names each of their
+# records in `source`. Every path starts with one of these.
 FIRM_RECORD_IDS = {
     "accounts": "account_id",
     "portfolios": "portfolio_id",
