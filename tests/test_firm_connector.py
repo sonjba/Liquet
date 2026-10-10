@@ -86,7 +86,28 @@ def test_clients_are_read_correctly():
     {"client_id": "CL-005", "name": "Hart Family Trust", "client_type": "trust",      "source": "portfolios/PF-CL-005/client"},
 ]
 
+def _fixture_cash_book():
+    return firm_connector.to_cash_book(
+        firm_connector.load_json(ACCOUNT_LIST),
+        firm_connector.load_json(PORTFOLIO_LIST),
+    )
 
+
+def test_cash_book_has_every_movement():
+    # Regression: an earlier version never appended the portfolio movements,
+    # so only the account movement came through.
+    assert len(_fixture_cash_book()) == 17   # 16 June movements + 1 May interest
+
+
+def test_cash_book_trade_entry_is_read_correctly():
+    entries = {e["entry_id"]: e for e in _fixture_cash_book()}
+    assert entries["CE-2026-06-0002"] == {
+        "entry_id": "CE-2026-06-0002", "date": "2026-06-01", "recorded_at": "2026-06-01",
+        "entry_type": "TRADE_SETTLEMENT", "description": "Buy 400 ALBN", "reference": "TR-26060101",
+        "account_id": "ACC-KRW-CASH-01", "portfolio_id": "PF-CL-001", "trade_id": "TR-26060101",
+        "ticker": None, "debit": None, "credit": "4852.40",
+        "source": "portfolios/PF-CL-001/cash_movements/1",
+    }
 
 # ---------------- boundaries ----------------
 
@@ -112,6 +133,31 @@ def test_portfolio_without_client_raises():
     raw_portfolio = {"portfolio_id": "P1"}
     with pytest.raises(ValueError, match="missing or invalid 'client'"):
         firm_connector.to_clients([raw_portfolio])
+
+def test_every_cash_entry_has_exactly_one_of_debit_or_credit():
+    for e in _fixture_cash_book():
+        assert (e["debit"] is None) != (e["credit"] is None), e["entry_id"]
+
+def test_out_movement_goes_to_credit_only():
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [_raw_movement(direction="OUT", amount="50.00")]
+    [entry] = firm_connector.to_cash_book([], [portfolio])
+    assert entry["credit"] == "50.00"
+    assert entry["debit"] is None
+
+def test_account_movement_has_no_portfolio():
+    entries = {e["entry_id"]: e for e in _fixture_cash_book()}
+    interest = entries["CE-2026-05-0030"]
+    assert interest["portfolio_id"] is None
+    assert interest["source"].startswith("accounts/")
+
+
+def test_empty_cash_book_inputs_give_empty_list():
+    assert firm_connector.to_cash_book([], []) == []
+
+
+def test_portfolio_without_cash_movements_gives_no_entries():
+    assert firm_connector.to_cash_book([], [_raw_portfolio("P1", "C1")]) == []
 
 # ---------------- silent wrong ----------------
 
@@ -150,6 +196,14 @@ def _raw_portfolio(portfolio_id, client_id, full_name="Some Name"):
         "client": {"client_id": client_id, "full_name": full_name, "type": "individual"},
     }
 
+def _raw_movement(movement_id="M1", direction="IN", amount="100.00", **extra):
+    movement = {
+        "movement_id": movement_id, "value_date": "2026-06-01", "entered_on": "2026-06-01",
+        "kind": "SUBSCRIPTION", "narrative": "Test", "our_ref": "REF-1",
+        "direction": direction, "amount": amount,
+    }
+    movement.update(extra)   # e.g. trade={...} or dividend={...}
+    return movement
 
 def test_portfolios_keep_their_own_client_id():
     # Catches every portfolio taking the first portfolio's client_id.
@@ -215,3 +269,20 @@ def test_portfolio_without_client_raises_in_to_portfolios():
     del raw["client"]
     with pytest.raises(ValueError, match="missing client"):
         firm_connector.to_portfolios([raw])
+
+def test_unknown_direction_raises():
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [_raw_movement(direction="SIDEWAYS")]
+    with pytest.raises(ValueError, match="IN or OUT"):
+        firm_connector.to_cash_book([], [portfolio])
+
+
+@pytest.mark.parametrize("missing", ["movement_id", "value_date", "entered_on", "kind",
+                                     "narrative", "our_ref", "direction", "amount"])
+def test_movement_missing_field_raises(missing):
+    movement = _raw_movement()
+    del movement[missing]
+    portfolio = _raw_portfolio("P1", "C1")
+    portfolio["cash_movements"] = [movement]
+    with pytest.raises(ValueError, match=missing):
+        firm_connector.to_cash_book([], [portfolio])
