@@ -12,6 +12,7 @@ rules on top:
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 from firm_mapping import FIRM_DIRECTION_CODES, FIRM_MAPPING, FIRM_RECORD_IDS
@@ -136,6 +137,44 @@ def _one_per_id(records: list[dict], id_field: str, what: str) -> list[dict]:
             continue   # same thing, already recorded
         by_id[record_id] = record
     return list(by_id.values())
+
+
+# ---------------- the functions Liquet asks for data through ----------------
+
+class FirmFileConnector:
+    """The firm's data, read from JSON files instead of the firm's database.
+
+    It offers the same functions a database connector will offer (see
+    "Connectors" in canonical-format.md), so the rest of Liquet doesn't
+    know or care where the data came from. Tests use it, so they run
+    without a database.
+
+    Liquet runs canonical_checks.check_canonical() on `canonical` before
+    asking for anything else.
+    """
+
+    def __init__(self, folder: Path):
+        folder = Path(folder)
+        self.canonical = to_canonical(load_json(folder / "accounts.json"),
+                                      load_json(folder / "portfolios.json"))
+
+    def get_cash_entries(self, account_id: str, start: date, end: date) -> list[dict]:
+        """The firm's cash entries for one account whose `date` is between
+        start and end, both days included, oldest first.
+
+        `date` is when the money moved, so May's interest (dated 31 May)
+        belongs to May even if the bank pays it later. Each entry is a
+        copy: changing it doesn't change the connector's data.
+        """
+        if start > end:
+            raise ValueError(f"start {start} is after end {end}")
+        accounts = {a["account_id"] for a in self.canonical["accounts"]}
+        if account_id not in accounts:
+            raise ValueError(f"unknown account {account_id!r}; known: {', '.join(sorted(accounts))}")
+        entries = [dict(entry) for entry in self.canonical["cash_book"]
+                   if entry["account_id"] == account_id
+                   and start <= date.fromisoformat(entry["date"]) <= end]
+        return sorted(entries, key=lambda entry: (entry["date"], entry["entry_id"]))
 
 
 if __name__ == "__main__":
