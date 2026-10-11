@@ -33,6 +33,18 @@ def test_june_lines_are_read_correctly():
     assert lines[0]["paid_out"] is None
     assert lines[0]["balance"] == Decimal("275000.00")
 
+def test_every_line_gets_a_unique_id_and_the_statement_id():
+    header, lines = read_statement.read_statement(JUNE / "statement_header.json",
+                                                  JUNE / "bank_statement.csv")
+    assert all(line["statement_id"] == "ACC-KRW-CASH-01:2026-06" for line in lines)
+    assert len({line["line_id"] for line in lines}) == len(lines)
+    assert lines[-1]["line_id"] == "ACC-KRW-CASH-01:2026-06:L13"
+
+
+def test_ids_are_the_same_every_time_the_statement_is_read():
+    first = read_statement.read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
+    second = read_statement.read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
+    assert [l["line_id"] for l in first[1]] == [l["line_id"] for l in second[1]]
 
 # BOUNDARY CASES (assertions check that the data is rejected correctly) tmp_path
 def test_statement_with_no_transactions_gives_empty_list(tmp_path):

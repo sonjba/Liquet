@@ -21,7 +21,6 @@ Not yet (planned):
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -135,6 +134,20 @@ def read_lines(lines_path: Path) -> list[dict]:
 
 
 
+def add_ids(header: dict, lines: list[dict]) -> None:
+    """Give the statement and each line a stable id, used by matching and the graph.
+
+    statement_id = account + month, e.g. "ACC-KRW-CASH-01:2026-06"
+    line_id      = statement_id + line number, e.g. "ACC-KRW-CASH-01:2026-06:L8"
+    """
+    statement_id = f"{header['account_id']}:{header['period_start'].strftime('%Y-%m')}"
+    header["statement_id"] = statement_id
+    for line in lines:
+        line["statement_id"] = statement_id
+        line["line_id"] = f"{statement_id}:L{line['line_number']}"
+
+
+
 def check_totals(header: dict, lines:list[dict]) -> tuple[bool,str]:
     
     total = sum(line["amount"] for line in lines)
@@ -176,25 +189,23 @@ def read_statement(header_path: Path, lines_path: Path) -> tuple[dict, list[dict
         ok, message = check(header, lines)
         if not ok:
             raise ValueError(f"Statement check failed: {message}")
+    add_ids(header, lines)
     return header, lines
 
 
-# if __name__ == "__main__":
-#     header = read_header(Path("tests/fixtures/2026-06/statement_header.json"))
-#     lines = read_lines(Path("tests/fixtures/2026-06/bank_statement.csv"))
+if __name__ == "__main__":
+    header = read_header(Path("tests/fixtures/2026-06/statement_header.json"))
+    lines = read_lines(Path("tests/fixtures/2026-06/bank_statement.csv"))
 
-#     totals_ok, totals_message = check_totals(header, lines)
-#     running_ok, running_message = check_running_balance(header, lines)
-#     dates_ok, dates_message = check_dates(header, lines)
+    totals_ok, totals_message = check_totals(header, lines)
+    running_ok, running_message = check_running_balance(header, lines)
+    dates_ok, dates_message = check_dates(header, lines)
 
-#     print("PASS" if totals_ok else "FAIL", "totals:", totals_message)
-#     print("PASS" if running_ok else "FAIL", "running balance:", running_message)
-#     print("PASS" if dates_ok else "FAIL", "dates:", dates_message)
+    print("PASS" if totals_ok else "FAIL", "totals:", totals_message)
+    print("PASS" if running_ok else "FAIL", "running balance:", running_message)
+    print("PASS" if dates_ok else "FAIL", "dates:", dates_message)
 
-#     if totals_ok and running_ok and dates_ok:
-#         print("Statement checks passed")
-#     else:
-#         print("Statement checks FAILED: do not reconcile this statement")
-
-
-print(read_statement(Path("tests/fixtures/2026-06/statement_header.json"), Path("tests/fixtures/2026-06/bank_statement.csv")))
+    if totals_ok and running_ok and dates_ok:
+        print("Statement checks passed")
+    else:
+        print("Statement checks FAILED: do not reconcile this statement")
