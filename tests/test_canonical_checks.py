@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 
 import firm_connector
-from canonical_checks import (
+from firm_checks import (
     CanonicalCheckError, check_canonical, check_cash_entries, check_ids_are_unique,
     check_money_is_text, check_opening_balance_exists, check_references_exist,
     check_settlements_match_trades, check_trades_add_up,

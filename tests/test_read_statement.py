@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 import pytest
-import read_statement
+import bank_reader
 import re
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
@@ -14,7 +14,7 @@ CASES = Path(__file__).parent / "fixtures" / "cases"
 # Regression: list(reader) once used up the reader, so values stayed text;
 # a missing enumerate unpacking broke every line; Decimal("") failed on empty cells.
 def test_june_header_is_read_correctly():
-    header = read_statement.read_header(JUNE / "statement_header.json")
+    header = bank_reader.read_header(JUNE / "statement_header.json")
     assert header["account_id"] == "ACC-KRW-CASH-01"
     assert header["custodian"] == "Northgate Custody Bank"
     assert header["currency"] == "GBP"
@@ -24,7 +24,7 @@ def test_june_header_is_read_correctly():
     assert header["closing_balance"] == Decimal("285378.57")
 
 def test_june_lines_are_read_correctly():
-    lines = read_statement.read_lines(JUNE / "bank_statement.csv")
+    lines = bank_reader.read_lines(JUNE / "bank_statement.csv")
     assert len(lines) == 12
     assert lines[0]["date"] == date(2026, 6, 1)
     assert lines[0]["description"] == "SUBSCRIPTION CL-001 HART A"
@@ -34,7 +34,7 @@ def test_june_lines_are_read_correctly():
     assert lines[0]["balance"] == Decimal("275000.00")
 
 def test_every_line_gets_a_unique_id_and_the_statement_id():
-    header, lines = read_statement.read_statement(JUNE / "statement_header.json",
+    header, lines = bank_reader.read_statement(JUNE / "statement_header.json",
                                                   JUNE / "bank_statement.csv")
     assert all(line["statement_id"] == "ACC-KRW-CASH-01:2026-06" for line in lines)
     assert len({line["line_id"] for line in lines}) == len(lines)
@@ -42,8 +42,8 @@ def test_every_line_gets_a_unique_id_and_the_statement_id():
 
 
 def test_ids_are_the_same_every_time_the_statement_is_read():
-    first = read_statement.read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
-    second = read_statement.read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
+    first = bank_reader.read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
+    second = bank_reader.read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
     assert [l["line_id"] for l in first[1]] == [l["line_id"] for l in second[1]]
 
 # BOUNDARY CASES (assertions check that the data is rejected correctly) tmp_path
@@ -51,7 +51,7 @@ def test_statement_with_no_transactions_gives_empty_list(tmp_path):
     csv_file = tmp_path / "statement.csv"
     csv_file.write_text(HEADER_ROW, encoding="utf-8")
 
-    lines = read_statement.read_lines(csv_file)
+    lines = bank_reader.read_lines(csv_file)
 
     assert lines == []
 
@@ -62,7 +62,7 @@ def test_statement_with_negative_balance(tmp_path):
         encoding="utf-8",
     )
 
-    lines = read_statement.read_lines(csv_file)
+    lines = bank_reader.read_lines(csv_file)
 
     assert len(lines) == 1
     assert lines[0]["amount"] == Decimal("-100.00")
@@ -75,7 +75,7 @@ def test_statement_with_one_transaction(tmp_path):
         encoding="utf-8",
     )
 
-    lines = read_statement.read_lines(csv_file)
+    lines = bank_reader.read_lines(csv_file)
 
     assert len(lines) == 1
     assert lines[0]["amount"] == Decimal("100.00")
@@ -90,7 +90,7 @@ def test_negative_paid_out_is_rejected(tmp_path):
     )
 
     with pytest.raises(ValueError, match="must not be negative"):
-        read_statement.read_lines(csv_file)
+        bank_reader.read_lines(csv_file)
 
 # Regression: Decimal accepts "NaN"; the error message was first put in the wrong branch.
 def test_nan_amount_is_rejected(tmp_path):
@@ -101,32 +101,32 @@ def test_nan_amount_is_rejected(tmp_path):
     )
 
     with pytest.raises(ValueError, match="not a finite number"):
-        read_statement.read_lines(csv_file)
+        bank_reader.read_lines(csv_file)
 
 
 # SILENT WRONGS (assertions check that the data is rejected correctly) pytest.raises
 def test_cancelling_errors_fool_totals_but_not_running_balance():
     case = "check_fail_running_balance_errors_cancel_in_totals"
-    header = read_statement.read_header(CASES / "checks" / f"{case}.json")
-    lines = read_statement.read_lines(CASES / "checks" / f"{case}.csv")
+    header = bank_reader.read_header(CASES / "checks" / f"{case}.json")
+    lines = bank_reader.read_lines(CASES / "checks" / f"{case}.csv")
 
-    totals_ok, totals_message = read_statement.check_totals(header, lines)
+    totals_ok, totals_message = bank_reader.check_totals(header, lines)
     assert totals_ok, totals_message        # the trap: totals is fooled
 
-    running_ok, running_message = read_statement.check_running_balance(header, lines)
+    running_ok, running_message = bank_reader.check_running_balance(header, lines)
     assert not running_ok                   # the catch
     assert "Line 2" in running_message      # and it points at the right line
 
 def test_wrong_closing_balance_fails_totals_only():
-    header = read_statement.read_header(CASES / "checks" / "check_fail_totals_closing_balance_wrong.json")
-    lines = read_statement.read_lines(CASES / "checks" / "check_fail_totals_closing_balance_wrong.csv")
+    header = bank_reader.read_header(CASES / "checks" / "check_fail_totals_closing_balance_wrong.json")
+    lines = bank_reader.read_lines(CASES / "checks" / "check_fail_totals_closing_balance_wrong.csv")
 
-    totals_ok, totals_message = read_statement.check_totals(header, lines)
+    totals_ok, totals_message = bank_reader.check_totals(header, lines)
     assert not totals_ok
     assert "1224.50" in totals_message   # what the lines add up to
     assert "1224.00" in totals_message   # what the header claims
 
-    running_ok, running_message = read_statement.check_running_balance(header, lines)
+    running_ok, running_message = bank_reader.check_running_balance(header, lines)
     assert running_ok, running_message
 
 # BAD INPUTS (assertions check that the data is rejected correctly) pytest.raises + parametrize
@@ -157,7 +157,7 @@ def test_wrong_closing_balance_fails_totals_only():
 ])
 def test_bad_lines_file_is_rejected(file_name, expected):
     with pytest.raises(ValueError, match=re.escape(expected)):
-        read_statement.read_lines(CASES / "lines" / file_name)
+        bank_reader.read_lines(CASES / "lines" / file_name)
 
 # Regression: Excel's invisible BOM broke the first column name (see ok_bom_from_excel.csv).
 @pytest.mark.parametrize("file_name", [
@@ -169,7 +169,7 @@ def test_bad_lines_file_is_rejected(file_name, expected):
     "ok_pound_sign_in_description.csv",
 ])
 def test_valid_lines_file_is_read(file_name):
-    read_statement.read_lines(CASES / "lines" / file_name)
+    bank_reader.read_lines(CASES / "lines" / file_name)
 
 
 # REGRESSION TESTS (assertions check that the data is rejected correctly)
@@ -186,17 +186,17 @@ def test_valid_lines_file_is_read(file_name):
 ])
 def test_bad_header_file_is_rejected(file_name, expected):
     with pytest.raises(ValueError, match=re.escape(expected)):
-        read_statement.read_header(CASES / "headers" / file_name)
+        bank_reader.read_header(CASES / "headers" / file_name)
 
 
 def test_valid_header_file_is_read():
-    header = read_statement.read_header(CASES / "headers" / "ok_header.json")
+    header = bank_reader.read_header(CASES / "headers" / "ok_header.json")
     assert header["opening_balance"] == Decimal("1000.00")
     assert header["closing_balance"] == Decimal("1224.50")
 
 
 def test_lines_on_first_and_last_day_of_period_pass_dates_check(tmp_path):
-    header = read_statement.read_header(JUNE / "statement_header.json")
+    header = bank_reader.read_header(JUNE / "statement_header.json")
     csv_file = tmp_path / "statement.csv"
     csv_file.write_text(
         HEADER_ROW
@@ -204,16 +204,16 @@ def test_lines_on_first_and_last_day_of_period_pass_dates_check(tmp_path):
         + "2026-06-30,LAST DAY OF PERIOD,REF-2,,50.00,250050.00\n",
         encoding="utf-8",
     )
-    lines = read_statement.read_lines(csv_file)
+    lines = bank_reader.read_lines(csv_file)
 
-    dates_ok, dates_message = read_statement.check_dates(header, lines)
+    dates_ok, dates_message = bank_reader.check_dates(header, lines)
     assert dates_ok, dates_message
 
 
 def test_line_after_period_end_fails_dates_check():
     case = "check_fail_dates_outside_period"
-    header = read_statement.read_header(CASES / "checks" / f"{case}.json")
-    lines = read_statement.read_lines(CASES / "checks" / f"{case}.csv")
+    header = bank_reader.read_header(CASES / "checks" / f"{case}.json")
+    lines = bank_reader.read_lines(CASES / "checks" / f"{case}.csv")
 
-    dates_ok, dates_message = read_statement.check_dates(header, lines)
+    dates_ok, dates_message = bank_reader.check_dates(header, lines)
     assert not dates_ok

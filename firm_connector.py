@@ -153,10 +153,9 @@ class FirmFileConnector:
     asking for anything else.
     """
 
-    def __init__(self, folder: Path):
-        folder = Path(folder)
-        self.canonical = to_canonical(load_json(folder / "accounts.json"),
-                                      load_json(folder / "portfolios.json"))
+    def __init__(self, accounts_path: Path, portfolios_path: Path):
+        self.canonical = to_canonical(load_json(Path(accounts_path)),
+                                      load_json(Path(portfolios_path)))
 
     def get_cash_entries(self, account_id: str, start: date, end: date) -> list[dict]:
         """The firm's cash entries for one account whose `date` is between
