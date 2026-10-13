@@ -33,13 +33,13 @@ def _firm(item_id: str = "F1", **changes) -> dict:
     return _item("firm", item_id, **changes)
 
 
-def _pairs(result: dict) -> dict[str, str]:
-    """{bank_id: firm_id} for every decision."""
-    return {d["bank_id"]: d["firm_id"] for d in result["decisions"]}
-
-
 def _short(bank_id: str) -> str:
     return bank_id.split(":")[-1]          # "ACC-KRW-CASH-01:2026-06:L3" -> "L3"
+
+
+def _pairs_by_rule(result: dict, rule: str) -> dict[str, str]:
+    """{"L3": "CE-...", ...} for the decisions one rule made."""
+    return {_short(d["bank_id"]): d["firm_id"] for d in result["decisions"] if d["rule"] == rule}
 
 
 @pytest.fixture(scope="module")
@@ -52,6 +52,20 @@ def june_result():
                  [firm_to_item(entry, trades) for entry in entries])
 
 
+# ---------------- June: what is left after R1 and R2 ----------------
+
+def test_lines_r1_and_r2_cannot_settle_are_left_for_later_rules(june_result):
+    left = {_short(item["id"]) for item in june_result["unmatched_bank"]}
+    assert left == {"L8", "L11", "L12", "L13"}
+
+
+def test_firm_entries_r1_and_r2_cannot_settle_are_left_for_later_rules(june_result):
+    left = {item["id"] for item in june_result["unmatched_firm"]}
+    assert left == {"CE-2026-06-0007", "CE-2026-06-0008",
+                    "CE-2026-06-0011", "CE-2026-06-0012", "CE-2026-06-0013",
+                    "CE-2026-06-0014", "CE-2026-06-0015", "CE-2026-06-0016"}
+
+
 # ---------------- R1 on June ----------------
 
 R1_JUNE_PAIRS = {
@@ -62,27 +76,14 @@ R1_JUNE_PAIRS = {
 
 
 def test_r1_pairs_exactly_the_expected_june_lines(june_result):
-    pairs = {_short(b): f for b, f in _pairs(june_result).items()}
-    assert pairs == R1_JUNE_PAIRS
+    assert _pairs_by_rule(june_result, "R1") == R1_JUNE_PAIRS
 
 
 def test_every_r1_decision_is_congruit_with_no_differences(june_result):
     for decision in june_result["decisions"]:
-        assert decision["verdict"] == "CONGRUIT"
-        assert decision["rule"] == "R1"
-        assert decision["differences"] == []
-
-
-def test_lines_r1_cannot_settle_are_left_for_later_rules(june_result):
-    left = {_short(item["id"]) for item in june_result["unmatched_bank"]}
-    assert left == {"L5", "L8", "L11", "L12", "L13"}
-
-
-def test_firm_entries_r1_cannot_settle_are_left_for_later_rules(june_result):
-    left = {item["id"] for item in june_result["unmatched_firm"]}
-    assert left == {"CE-2026-06-0004", "CE-2026-06-0007", "CE-2026-06-0008",
-                    "CE-2026-06-0011", "CE-2026-06-0012", "CE-2026-06-0013",
-                    "CE-2026-06-0014", "CE-2026-06-0015", "CE-2026-06-0016"}
+        if decision["rule"] == "R1":
+            assert decision["verdict"] == "CONGRUIT"
+            assert decision["differences"] == []
 
 
 def test_settlement_is_compared_with_its_settlement_date(june_result):
@@ -112,11 +113,12 @@ def test_date_tolerance_is_one_day_either_way(bank_day, matches):
 
 def test_different_amount_is_not_r1():
     result = match([_bank(amount=Decimal("90.00"))], [_firm()])
-    assert result["decisions"] == []
+    assert [d["rule"] for d in result["decisions"]] == ["R2"]     # R2's, not R1's
 
 
 def test_opposite_sign_is_not_a_match():
-    # Money in at the bank must never pair with money out at the firm.
+    # Money in at the bank must never pair with money out at the firm,
+    # not by R1 and not by R2.
     result = match([_bank(amount=Decimal("100.00"))], [_firm(amount=Decimal("-100.00"))])
     assert result["decisions"] == []
 
@@ -145,3 +147,47 @@ def test_match_does_not_change_the_lists_it_was_given():
     bank_items, firm_items = [_bank()], [_firm()]
     match(bank_items, firm_items)
     assert len(bank_items) == 1 and len(firm_items) == 1
+
+
+# ---------------- R2: same reference, amount differs ----------------
+
+def test_r2_pairs_the_june_dividend(june_result):
+    assert _pairs_by_rule(june_result, "R2") == {"L5": "CE-2026-06-0004"}
+
+
+def test_r2_records_the_difference_as_bank_minus_firm(june_result):
+    decision = next(d for d in june_result["decisions"] if d["rule"] == "R2")
+    assert decision["verdict"] == "CONGRUIT"
+    assert decision["differences"] == [{
+        "field": "amount",
+        "bank": Decimal("1275.00"),
+        "firm": Decimal("1500.00"),
+        "difference": Decimal("-225.00"),
+    }]
+
+
+def test_r2_bank_paying_more_gives_a_positive_difference():
+    result = match([_bank(amount=Decimal("110.00"))], [_firm()])
+    assert result["decisions"][0]["differences"][0]["difference"] == Decimal("10.00")
+
+
+def test_r2_works_for_money_out_too():
+    # Firm expected to pay 100, bank shows 105 paid: difference -5.00.
+    result = match([_bank(amount=Decimal("-105.00"))], [_firm(amount=Decimal("-100.00"))])
+    assert result["decisions"][0]["rule"] == "R2"
+    assert result["decisions"][0]["differences"][0]["difference"] == Decimal("-5.00")
+
+
+def test_r2_needs_the_date_within_tolerance():
+    result = match([_bank(amount=Decimal("90.00"), date=date(2026, 6, 20))], [_firm()])
+    assert result["decisions"] == []
+
+
+def test_r2_leaves_groups_for_r3():
+    result = match([_bank(amount=Decimal("90.00"))], [_firm("F1"), _firm("F2")])
+    assert result["decisions"] == []
+
+
+def test_exact_match_is_taken_by_r1_not_r2():
+    result = match([_bank()], [_firm()])
+    assert [d["rule"] for d in result["decisions"]] == ["R1"]
