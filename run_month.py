@@ -37,7 +37,8 @@ def main(args) -> dict:
     month["firm_items"] = [firm_to_item(entry, trades, parties) for entry in month["entries"]]
 
     # 5. Match: pair bank items with firm items, rule by rule
-    month["result"] = match(month["bank_items"], month["firm_items"])
+    month["result"] = match(month["bank_items"], month["firm_items"],
+                            period_end=month["header"]["period_end"])
 
     return month
 
@@ -62,6 +63,11 @@ def show(month: dict) -> None:
             diff += f"  group diff {d['evidence']['group_difference']}"
         print(f"  {d['bank_id'].split(':')[-1]:<4} <-> {d['firm_id']}  "
               f"{d['rule']}  {d['verdict']}  lag {d['evidence']['lag_days']}d{diff}")
+    print(f"\nFindings: {len(result['findings'])}")
+    for f in result["findings"]:
+        print(f"  {f['finding_id']:<22} {f['category']} / {f['type']}  "
+              f"adjust {f['adjusts']} {f['adjustment']}  {f['status']}")
+
     print(f"\nUnmatched bank: {[i['id'].split(':')[-1] for i in result['unmatched_bank']]}")
     print(f"Unmatched firm: {[i['id'] for i in result['unmatched_firm']]}")
 

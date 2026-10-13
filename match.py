@@ -3,24 +3,30 @@
 from __future__ import annotations
 
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
 DATE_TOLERANCE = timedelta(days=1)
 
 
-def match(bank_items: list[dict], firm_items: list[dict]) -> dict:
-    """Run the rules in order; return decisions and what's left on each side."""
+def match(bank_items: list[dict], firm_items: list[dict], period_end: date) -> dict:
+    """Run the rules in order; return decisions, findings and what's left on each side.
+
+    period_end is the statement's last day: R5 needs it to tell which
+    settlements belong to next month.
+    """
     open_bank = list(bank_items)
     open_firm = list(firm_items)
     decisions = []
+    findings = []
 
     _rule_r1(open_bank, open_firm, decisions)
     _rule_r2(open_bank, open_firm, decisions)
     _rule_r3(open_bank, open_firm, decisions)
     _rule_r4(open_bank, open_firm, decisions)
-    # later: R5
+    _rule_r5(open_firm, period_end, findings)
 
     return {"decisions": decisions,
+            "findings": findings,
             "unmatched_bank": open_bank,
             "unmatched_firm": open_firm}
 
@@ -203,3 +209,36 @@ def _rule_r4(open_bank, open_firm, decisions) -> None:
                     bank, firm, candidates, "NON LIQUET",
                     f"{len(candidates)} candidates with this amount and date; "
                     "bank text does not name exactly one"))
+
+
+def _rule_r5(open_firm, period_end: date, findings) -> None:
+    """R5 - Settlement after the period: the money moves next month.
+
+    An open trade-settlement entry whose expected date (the trade's settlement
+    date) is after the statement's last day can't be on this statement. That is
+    fully decided by the dates, so the rule writes a Finding: IN_TRANSITU.
+    The entry is then accounted for and leaves the open list.
+
+    The Finding adjusts the bank side: the bank balance will include this
+    amount once it settles. Status PROPOSED: a person still approves it.
+    """
+    for firm in list(open_firm):
+        if firm["entry_type"] != "TRADE_SETTLEMENT" or firm["expected_date"] <= period_end:
+            continue
+        findings.append({
+            "finding_id": f"R5:{firm['id']}",
+            "rule": "R5",
+            "category": "IN_TRANSITU",
+            "type": "OUTSTANDING_PAYMENT" if firm["amount"] < 0 else "OUTSTANDING_RECEIPT",
+            "firm_ids": [firm["id"]],
+            "bank_ids": [],
+            "adjusts": "bank",
+            "adjustment": firm["amount"],
+            "evidence": {"reference": firm["reference"],
+                         "settlement_date": firm["expected_date"],
+                         "period_end": period_end},
+            "status": "PROPOSED",
+            "proposed_by": "R5",
+            "decided_by": None,
+        })
+        open_firm.remove(firm)
