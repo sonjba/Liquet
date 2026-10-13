@@ -1,4 +1,4 @@
-"""Run Liquet for one month: read both sides, check them, prepare them for matching."""
+"""Run Liquet for one month: read both sides, check them, prepare them, match them."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from bank_reader import read_statement
 from firm_checks import check_canonical
 from firm_connector import FirmFileConnector
 from firm_prepare import firm_to_item
+from match import match
 
 
 def main(args) -> dict:
@@ -34,22 +35,31 @@ def main(args) -> dict:
     month["bank_items"] = [bank_to_item(line) for line in month["lines"]]
     month["firm_items"] = [firm_to_item(entry, trades) for entry in month["entries"]]
 
-    # 5. Match (next)
-    # month["result"] = match(month["bank_items"], month["firm_items"])
+    # 5. Match: pair bank items with firm items, rule by rule
+    month["result"] = match(month["bank_items"], month["firm_items"])
 
     return month
 
 
 def show(month: dict) -> None:
-    """Print both sides in the matching shape, so they can be compared by eye."""
+    """Print both sides and the matching result."""
     header = month["header"]
     print(f"Statement {header['statement_id']}: {header['period_start']} to {header['period_end']}")
+
     for title, items in (("Bank items", month["bank_items"]), ("Firm items", month["firm_items"])):
         print(f"\n{title}: {len(items)}")
         for item in items:
             short_id = item["id"].split(":")[-1]          # "L3" or "CE-2026-06-0002"
             print(f"  {short_id:<16} {item['expected_date']}  {item['amount']:>10}  "
                   f"{item['reference'] or '-':<16} {item['entry_type'] or '-':<17} {item['description']}")
+
+    result = month["result"]
+    print(f"\nMatched: {len(result['decisions'])}")
+    for d in result["decisions"]:
+        print(f"  {d['bank_id'].split(':')[-1]:<4} <-> {d['firm_id']}  "
+              f"{d['rule']}  {d['verdict']}  lag {d['evidence']['lag_days']}d")
+    print(f"\nUnmatched bank: {[i['id'].split(':')[-1] for i in result['unmatched_bank']]}")
+    print(f"Unmatched firm: {[i['id'] for i in result['unmatched_firm']]}")
 
 
 if __name__ == "__main__":
