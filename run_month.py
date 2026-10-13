@@ -57,6 +57,8 @@ def show(month: dict) -> None:
     print(f"\nMatched: {len(result['decisions'])}")
     for d in result["decisions"]:
         diff = "".join(f"  diff {x['difference']}" for x in d["differences"])
+        if "group_difference" in d["evidence"]:
+            diff += f"  group diff {d['evidence']['group_difference']}"
         print(f"  {d['bank_id'].split(':')[-1]:<4} <-> {d['firm_id']}  "
               f"{d['rule']}  {d['verdict']}  lag {d['evidence']['lag_days']}d{diff}")
     print(f"\nUnmatched bank: {[i['id'].split(':')[-1] for i in result['unmatched_bank']]}")

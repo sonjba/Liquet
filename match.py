@@ -14,7 +14,8 @@ def match(bank_items: list[dict], firm_items: list[dict]) -> dict:
 
     _rule_r1(open_bank, open_firm, decisions)
     _rule_r2(open_bank, open_firm, decisions)
-    # later: R3, R4, R5
+    _rule_r3(open_bank, open_firm, decisions)
+    # later: R4, R5
 
     return {"decisions": decisions,
             "unmatched_bank": open_bank,
@@ -85,3 +86,44 @@ def _rule_r2(open_bank, open_firm, decisions) -> None:
         })
         open_bank.remove(bank)
         open_firm.remove(firm)
+
+
+def _rule_r3(open_bank, open_firm, decisions) -> None:
+    """R3 - One bank line, several entries: the bank paid a group in one go.
+
+    Two or more open firm items share the bank line's reference, all move
+    money the same way as the bank line, and all are expected within
+    DATE_TOLERANCE of it. Each entry gets its own CONGRUIT decision to the
+    same bank line. The group's total is compared with the bank amount; the
+    difference (bank minus group total) goes into each decision's evidence,
+    not into `differences`, because it belongs to the group, not to one entry.
+    """
+    for bank in list(open_bank):
+        if bank["reference"] is None:
+            continue
+        group = [firm for firm in open_firm if firm["reference"] == bank["reference"]]
+        if len(group) < 2:                    # one candidate was R1's or R2's job
+            continue
+        same_direction = all((firm["amount"] > 0) == (bank["amount"] > 0) for firm in group)
+        on_time = all(abs(bank["date"] - firm["expected_date"]) <= DATE_TOLERANCE for firm in group)
+        if not same_direction or not on_time:
+            continue
+        group_total = sum(firm["amount"] for firm in group)
+        evidence = {
+            "reference": bank["reference"],
+            "group_size": len(group),
+            "group_total": group_total,
+            "bank_amount": bank["amount"],
+            "group_difference": bank["amount"] - group_total,
+        }
+        for firm in group:
+            decisions.append({
+                "bank_id": bank["id"],
+                "firm_id": firm["id"],
+                "verdict": "CONGRUIT",
+                "rule": "R3",
+                "differences": [],
+                "evidence": dict(evidence, lag_days=(bank["date"] - firm["expected_date"]).days),
+            })
+            open_firm.remove(firm)
+        open_bank.remove(bank)

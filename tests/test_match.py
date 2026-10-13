@@ -52,18 +52,16 @@ def june_result():
                  [firm_to_item(entry, trades) for entry in entries])
 
 
-# ---------------- June: what is left after R1 and R2 ----------------
+# ---------------- June: what the rules leave over ----------------
 
-def test_lines_r1_and_r2_cannot_settle_are_left_for_later_rules(june_result):
+def test_lines_the_rules_cannot_settle_are_left_over(june_result):
     left = {_short(item["id"]) for item in june_result["unmatched_bank"]}
-    assert left == {"L8", "L11", "L12", "L13"}
+    assert left == {"L8", "L12", "L13"}
 
 
-def test_firm_entries_r1_and_r2_cannot_settle_are_left_for_later_rules(june_result):
+def test_firm_entries_the_rules_cannot_settle_are_left_over(june_result):
     left = {item["id"] for item in june_result["unmatched_firm"]}
-    assert left == {"CE-2026-06-0007", "CE-2026-06-0008",
-                    "CE-2026-06-0011", "CE-2026-06-0012", "CE-2026-06-0013",
-                    "CE-2026-06-0014", "CE-2026-06-0015", "CE-2026-06-0016"}
+    assert left == {"CE-2026-06-0007", "CE-2026-06-0008", "CE-2026-06-0011"}
 
 
 # ---------------- R1 on June ----------------
@@ -128,11 +126,10 @@ def test_missing_reference_on_both_sides_is_not_a_match():
     assert result["decisions"] == []
 
 
-def test_two_firm_items_with_the_same_reference_are_left_alone():
+def test_two_firm_items_with_the_same_reference_are_not_r1():
     # A group (one bank line, several entries) is R3's job, not R1's.
     result = match([_bank()], [_firm("F1"), _firm("F2")])
-    assert result["decisions"] == []
-    assert len(result["unmatched_firm"]) == 2
+    assert {d["rule"] for d in result["decisions"]} == {"R3"}
 
 
 def test_a_firm_item_is_used_only_once():
@@ -185,9 +182,57 @@ def test_r2_needs_the_date_within_tolerance():
 
 def test_r2_leaves_groups_for_r3():
     result = match([_bank(amount=Decimal("90.00"))], [_firm("F1"), _firm("F2")])
-    assert result["decisions"] == []
+    assert {d["rule"] for d in result["decisions"]} == {"R3"}
 
 
 def test_exact_match_is_taken_by_r1_not_r2():
     result = match([_bank()], [_firm()])
     assert [d["rule"] for d in result["decisions"]] == ["R1"]
+
+
+# ---------------- R3: one bank line, several entries ----------------
+
+JUNE_FEES = ["CE-2026-06-0012", "CE-2026-06-0013", "CE-2026-06-0014",
+             "CE-2026-06-0015", "CE-2026-06-0016"]
+
+
+def test_r3_pairs_the_fee_transfer_with_all_five_fees(june_result):
+    r3 = [d for d in june_result["decisions"] if d["rule"] == "R3"]
+    assert {_short(d["bank_id"]) for d in r3} == {"L11"}
+    assert sorted(d["firm_id"] for d in r3) == JUNE_FEES
+
+
+def test_r3_records_the_group_total_and_difference(june_result):
+    # Fees add up to -1598.50; the bank moved -1562.50: bank minus firm = +36.00.
+    for decision in (d for d in june_result["decisions"] if d["rule"] == "R3"):
+        assert decision["verdict"] == "CONGRUIT"
+        assert decision["differences"] == []
+        assert decision["evidence"]["group_size"] == 5
+        assert decision["evidence"]["group_total"] == Decimal("-1598.50")
+        assert decision["evidence"]["bank_amount"] == Decimal("-1562.50")
+        assert decision["evidence"]["group_difference"] == Decimal("36.00")
+
+
+def test_r3_group_that_adds_up_has_zero_difference():
+    result = match([_bank(amount=Decimal("100.00"))],
+                   [_firm("F1", amount=Decimal("60.00")), _firm("F2", amount=Decimal("40.00"))])
+    assert [d["evidence"]["group_difference"] for d in result["decisions"]] == [Decimal("0.00")] * 2
+    assert result["unmatched_bank"] == [] and result["unmatched_firm"] == []
+
+
+def test_r3_needs_every_entry_to_move_money_the_same_way():
+    result = match([_bank(amount=Decimal("100.00"))],
+                   [_firm("F1", amount=Decimal("150.00")), _firm("F2", amount=Decimal("-50.00"))])
+    assert result["decisions"] == []
+
+
+def test_r3_needs_every_entry_within_the_date_tolerance():
+    result = match([_bank(amount=Decimal("100.00"))],
+                   [_firm("F1", amount=Decimal("60.00")),
+                    _firm("F2", amount=Decimal("40.00"), expected_date=date(2026, 6, 20))])
+    assert result["decisions"] == []
+
+
+def test_r3_ignores_bank_lines_without_a_reference():
+    result = match([_bank(reference=None)], [_firm("F1", reference=None), _firm("F2", reference=None)])
+    assert result["decisions"] == []
