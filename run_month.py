@@ -9,7 +9,7 @@ from bank_prepare import bank_to_item
 from bank_reader import read_statement
 from firm_checks import check_canonical
 from firm_connector import FirmFileConnector
-from firm_prepare import firm_to_item
+from firm_prepare import firm_to_item, parties_by_portfolio
 from match import match
 
 
@@ -33,7 +33,8 @@ def main(args) -> dict:
     # 4. Prepare both sides in the same shape for matching
     trades = {t["trade_id"]: t for t in month["firm"]["trades"]}
     month["bank_items"] = [bank_to_item(line) for line in month["lines"]]
-    month["firm_items"] = [firm_to_item(entry, trades) for entry in month["entries"]]
+    parties = parties_by_portfolio(month["firm"])
+    month["firm_items"] = [firm_to_item(entry, trades, parties) for entry in month["entries"]]
 
     # 5. Match: pair bank items with firm items, rule by rule
     month["result"] = match(month["bank_items"], month["firm_items"])
@@ -54,7 +55,7 @@ def show(month: dict) -> None:
                   f"{item['reference'] or '-':<16} {item['entry_type'] or '-':<17} {item['description']}")
 
     result = month["result"]
-    print(f"\nMatched: {len(result['decisions'])}")
+    print(f"\nDecisions: {len(result['decisions'])}")
     for d in result["decisions"]:
         diff = "".join(f"  diff {x['difference']}" for x in d["differences"])
         if "group_difference" in d["evidence"]:

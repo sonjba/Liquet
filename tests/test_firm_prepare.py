@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 from firm_connector import FirmFileConnector
-from firm_prepare import expected_date, firm_to_item, signed_amount
+from firm_prepare import expected_date, firm_to_item, parties_by_portfolio, signed_amount
 
 JUNE_FIRM = Path(__file__).parent / "fixtures" / "2026-06" / "firm"
 ITEM_KEYS = {"id", "side", "date", "expected_date", "amount",
-             "reference", "entry_type", "description"}
+             "reference", "entry_type", "description", "party"}
 
 
 # ---------------- helpers ----------------
@@ -35,14 +35,16 @@ def _settlement(trade_id: str = "TR-1") -> dict:
 
 TRADES = {"TR-1": {"trade_id": "TR-1", "trade_date": "2026-06-01",
                    "settlement_date": "2026-06-03"}}
+PARTIES = {"PF-1": "Test Client"}
 
 
 @pytest.fixture(scope="module")
 def june_items():
     connector = FirmFileConnector(JUNE_FIRM / "accounts.json", JUNE_FIRM / "portfolios.json")
     trades = {t["trade_id"]: t for t in connector.canonical["trades"]}
+    parties = parties_by_portfolio(connector.canonical)
     entries = connector.get_cash_entries("ACC-KRW-CASH-01", date(2026, 6, 1), date(2026, 6, 30))
-    return {item["id"]: item for item in (firm_to_item(e, trades) for e in entries)}
+    return {item["id"]: item for item in (firm_to_item(e, trades, parties) for e in entries)}
 
 
 # ---------------- 1. signed_amount ----------------
@@ -80,7 +82,16 @@ def test_settlement_with_missing_trade_raises_naming_the_entry():
 # ---------------- other fields ----------------
 
 def test_empty_reference_becomes_none():
-    assert firm_to_item(_entry(reference=""), TRADES)["reference"] is None
+    assert firm_to_item(_entry(reference=""), TRADES, PARTIES)["reference"] is None
+
+
+def test_party_is_the_client_behind_the_portfolio():
+    assert firm_to_item(_entry(portfolio_id="PF-1"), TRADES, PARTIES)["party"] == "Test Client"
+
+
+def test_account_entry_has_no_party():
+    # Custody fees and interest belong to the account, not to a client.
+    assert firm_to_item(_entry(portfolio_id=None), TRADES, PARTIES)["party"] is None
 
 
 # ---------------- 4. June: shape ----------------
@@ -106,8 +117,14 @@ def test_june_settlement_is_prepared_correctly(june_items):
         "reference": "TR-26060101",
         "entry_type": "TRADE_SETTLEMENT",
         "description": "Buy 400 ALBN",
+        "party": "Amelia Hart",
     }
 
 
 def test_june_trade_settling_in_july_is_expected_in_july(june_items):
     assert june_items["CE-2026-06-0011"]["expected_date"] == date(2026, 7, 1)
+
+
+def test_june_subscriptions_carry_their_clients_names(june_items):
+    assert june_items["CE-2026-06-0007"]["party"] == "Priya Nair"
+    assert june_items["CE-2026-06-0008"]["party"] == "Hart Family Trust"

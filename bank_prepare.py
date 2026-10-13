@@ -1,7 +1,9 @@
-"""Turn bank lines and firm entries into the same shape for matching.
+"""Turn bank lines into Liquet's matching shape.
 
 Every item has: id, side, date, expected_date, amount (signed Decimal),
-reference (None if empty), entry_type (None if unknown), description.
+reference (None if empty), entry_type (None if unknown), description,
+party (None on the bank side: the bank's text is in description).
+firm_prepare.py gives firm entries the same shape.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ def bank_entry_type(description: str) -> str | None:
             return entry_type
     return None
 
+
 def bank_to_item(line: dict) -> dict:
     """One bank line as a matching item."""
     return {
@@ -28,4 +31,5 @@ def bank_to_item(line: dict) -> dict:
         "reference": line["reference"].strip() or None,
         "entry_type": bank_entry_type(line["description"]),
         "description": line["description"],
+        "party": None,                   # the bank's text is in description
     }

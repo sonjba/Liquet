@@ -7,7 +7,7 @@ import pytest
 from bank_prepare import bank_to_item
 from bank_reader import read_statement
 from firm_connector import FirmFileConnector
-from firm_prepare import firm_to_item
+from firm_prepare import firm_to_item, parties_by_portfolio
 from match import match
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
@@ -20,7 +20,7 @@ def _item(side: str, item_id: str, **changes) -> dict:
     item = {"id": item_id, "side": side,
             "date": date(2026, 6, 10), "expected_date": date(2026, 6, 10),
             "amount": Decimal("100.00"), "reference": "REF-1",
-            "entry_type": "SUBSCRIPTION", "description": "test"}
+            "entry_type": "SUBSCRIPTION", "description": "test", "party": None}
     item.update(changes)
     return item
 
@@ -33,13 +33,9 @@ def _firm(item_id: str = "F1", **changes) -> dict:
     return _item("firm", item_id, **changes)
 
 
-def _short(bank_id: str) -> str:
-    return bank_id.split(":")[-1]          # "ACC-KRW-CASH-01:2026-06:L3" -> "L3"
-
-
-def _pairs_by_rule(result: dict, rule: str) -> dict[str, str]:
-    """{"L3": "CE-...", ...} for the decisions one rule made."""
-    return {_short(d["bank_id"]): d["firm_id"] for d in result["decisions"] if d["rule"] == rule}
+def _pairs(result: dict) -> dict[str, str]:
+    """{bank_id: firm_id} for every decision."""
+    return {d["bank_id"]: d["firm_id"] for d in result["decisions"]}
 
 
 @pytest.fixture(scope="module")
@@ -47,21 +43,14 @@ def june_result():
     header, lines = read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
     firm = FirmFileConnector(JUNE / "firm" / "accounts.json", JUNE / "firm" / "portfolios.json")
     trades = {t["trade_id"]: t for t in firm.canonical["trades"]}
+    parties = parties_by_portfolio(firm.canonical)
     entries = firm.get_cash_entries(header["account_id"], header["period_start"], header["period_end"])
     return match([bank_to_item(line) for line in lines],
-                 [firm_to_item(entry, trades) for entry in entries])
+                 [firm_to_item(entry, trades, parties) for entry in entries])
 
 
-# ---------------- June: what the rules leave over ----------------
-
-def test_lines_the_rules_cannot_settle_are_left_over(june_result):
-    left = {_short(item["id"]) for item in june_result["unmatched_bank"]}
-    assert left == {"L8", "L12", "L13"}
-
-
-def test_firm_entries_the_rules_cannot_settle_are_left_over(june_result):
-    left = {item["id"] for item in june_result["unmatched_firm"]}
-    assert left == {"CE-2026-06-0007", "CE-2026-06-0008", "CE-2026-06-0011"}
+def _short(bank_id: str) -> str:
+    return bank_id.split(":")[-1]          # "ACC-KRW-CASH-01:2026-06:L3" -> "L3"
 
 
 # ---------------- R1 on June ----------------
@@ -73,6 +62,10 @@ R1_JUNE_PAIRS = {
 }
 
 
+def _pairs_by_rule(result: dict, rule: str) -> dict[str, str]:
+    return {_short(d["bank_id"]): d["firm_id"] for d in result["decisions"] if d["rule"] == rule}
+
+
 def test_r1_pairs_exactly_the_expected_june_lines(june_result):
     assert _pairs_by_rule(june_result, "R1") == R1_JUNE_PAIRS
 
@@ -82,6 +75,16 @@ def test_every_r1_decision_is_congruit_with_no_differences(june_result):
         if decision["rule"] == "R1":
             assert decision["verdict"] == "CONGRUIT"
             assert decision["differences"] == []
+
+
+def test_lines_the_rules_cannot_settle_are_left_over(june_result):
+    left = {_short(item["id"]) for item in june_result["unmatched_bank"]}
+    assert left == {"L12", "L13"}
+
+
+def test_firm_entries_the_rules_cannot_settle_are_left_over(june_result):
+    left = {item["id"] for item in june_result["unmatched_firm"]}
+    assert left == {"CE-2026-06-0008", "CE-2026-06-0011"}
 
 
 def test_settlement_is_compared_with_its_settlement_date(june_result):
@@ -121,9 +124,10 @@ def test_opposite_sign_is_not_a_match():
     assert result["decisions"] == []
 
 
-def test_missing_reference_on_both_sides_is_not_a_match():
+def test_missing_reference_is_not_r1():
+    # Without a reference R1-R3 can't pair them; R4 (amount and date) can.
     result = match([_bank(reference=None)], [_firm(reference=None)])
-    assert result["decisions"] == []
+    assert [d["rule"] for d in result["decisions"]] == ["R4"]
 
 
 def test_two_firm_items_with_the_same_reference_are_not_r1():
@@ -235,4 +239,84 @@ def test_r3_needs_every_entry_within_the_date_tolerance():
 
 def test_r3_ignores_bank_lines_without_a_reference():
     result = match([_bank(reference=None)], [_firm("F1", reference=None), _firm("F2", reference=None)])
+    assert "R3" not in {d["rule"] for d in result["decisions"]}
+
+
+# ---------------- R4: no reference match, find candidates ----------------
+
+def _r4(result: dict) -> list[dict]:
+    return [d for d in result["decisions"] if d["rule"] == "R4"]
+
+
+def test_r4_pairs_the_june_top_up_with_priya_nair(june_result):
+    congruit = [d for d in _r4(june_result) if d["verdict"] == "CONGRUIT"]
+    assert [(_short(d["bank_id"]), d["firm_id"]) for d in congruit] == [("L8", "CE-2026-06-0007")]
+
+
+def test_r4_rules_out_the_hart_trust_with_a_reason(june_result):
+    discrepat = [d for d in _r4(june_result) if d["verdict"] == "DISCREPAT"]
+    assert [(_short(d["bank_id"]), d["firm_id"]) for d in discrepat] == [("L8", "CE-2026-06-0008")]
+    assert "Priya Nair" in discrepat[0]["evidence"]["reason"]
+    assert "Hart Family Trust" in discrepat[0]["evidence"]["reason"]
+
+
+def test_r4_records_both_candidates_in_the_evidence(june_result):
+    for decision in _r4(june_result):
+        assert decision["evidence"]["candidates"] == ["CE-2026-06-0007", "CE-2026-06-0008"]
+
+
+def test_ruled_out_entry_stays_open_for_the_agent(june_result):
+    # DISCREPAT says "not this line"; CE-0008 still needs explaining.
+    assert "CE-2026-06-0008" in {item["id"] for item in june_result["unmatched_firm"]}
+
+
+def test_r4_single_candidate_is_congruit():
+    result = match([_bank(reference="BANK-OWN-REF")], [_firm(reference="FIRM-REF")])
+    assert [(d["rule"], d["verdict"]) for d in result["decisions"]] == [("R4", "CONGRUIT")]
+
+
+def test_r4_needs_exactly_the_same_amount():
+    result = match([_bank(reference=None, amount=Decimal("100.01"))], [_firm(reference=None)])
     assert result["decisions"] == []
+
+
+def test_r4_needs_the_date_within_tolerance():
+    result = match([_bank(reference=None, date=date(2026, 6, 13))], [_firm(reference=None)])
+    assert result["decisions"] == []
+
+
+def test_r4_known_types_must_agree():
+    result = match([_bank(reference=None, entry_type="DIVIDEND")],
+                   [_firm(reference=None, entry_type="SUBSCRIPTION")])
+    assert result["decisions"] == []
+
+
+def test_r4_unknown_bank_type_allows_any_type():
+    result = match([_bank(reference=None, entry_type=None)],
+                   [_firm(reference=None, entry_type="SUBSCRIPTION")])
+    assert [d["verdict"] for d in result["decisions"]] == ["CONGRUIT"]
+
+
+def test_r4_two_candidates_and_no_name_is_non_liquet():
+    result = match([_bank(reference=None, description="FASTER PAYMENT")],
+                   [_firm("F1", reference=None, party="Priya Nair"),
+                    _firm("F2", reference=None, party="Daniel Okoro")])
+    assert [d["verdict"] for d in result["decisions"]] == ["NON LIQUET", "NON LIQUET"]
+    # Nothing is settled: a person decides.
+    assert len(result["unmatched_bank"]) == 1 and len(result["unmatched_firm"]) == 2
+
+
+def test_r4_name_fitting_two_candidates_is_non_liquet():
+    # "HART" fits Amelia Hart and the Hart Family Trust: too weak to choose.
+    result = match([_bank(reference=None, description="FASTER PAYMENT HART")],
+                   [_firm("F1", reference=None, party="Amelia Hart"),
+                    _firm("F2", reference=None, party="Hart Family Trust")])
+    assert {d["verdict"] for d in result["decisions"]} == {"NON LIQUET"}
+
+
+def test_r4_name_must_be_a_whole_word():
+    # "NAIRN" is not "NAIR".
+    result = match([_bank(reference=None, description="PAYMENT NAIRN")],
+                   [_firm("F1", reference=None, party="Priya Nair"),
+                    _firm("F2", reference=None, party="Daniel Okoro")])
+    assert {d["verdict"] for d in result["decisions"]} == {"NON LIQUET"}

@@ -9,7 +9,7 @@ from bank_prepare import bank_entry_type, bank_to_item
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 ITEM_KEYS = {"id", "side", "date", "expected_date", "amount",
-             "reference", "entry_type", "description"}
+             "reference", "entry_type", "description", "party"}
 
 
 @pytest.fixture(scope="module")
@@ -50,6 +50,7 @@ def test_june_gives_twelve_items_with_the_same_keys(june_items):
     assert all(set(item) == ITEM_KEYS for item in june_items)
     assert all(isinstance(item["amount"], Decimal) for item in june_items)
     assert all(isinstance(item["date"], date) for item in june_items)
+    assert all(item["party"] is None for item in june_items)
 
 
 def test_settlement_line_is_prepared_correctly(june_items):
@@ -62,6 +63,7 @@ def test_settlement_line_is_prepared_correctly(june_items):
         "reference": "TR-26060101",
         "entry_type": "TRADE_SETTLEMENT",
         "description": "SETTLEMENT BUY 400 ALBN",
+        "party": None,
     }
 
 

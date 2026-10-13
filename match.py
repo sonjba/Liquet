@@ -1,6 +1,8 @@
 """Pair bank items with firm items, using the rules in docs/matching-rules.md."""
 
 from __future__ import annotations
+
+import re
 from datetime import timedelta
 
 DATE_TOLERANCE = timedelta(days=1)
@@ -15,7 +17,8 @@ def match(bank_items: list[dict], firm_items: list[dict]) -> dict:
     _rule_r1(open_bank, open_firm, decisions)
     _rule_r2(open_bank, open_firm, decisions)
     _rule_r3(open_bank, open_firm, decisions)
-    # later: R4, R5
+    _rule_r4(open_bank, open_firm, decisions)
+    # later: R5
 
     return {"decisions": decisions,
             "unmatched_bank": open_bank,
@@ -35,13 +38,9 @@ def _rule_r1(open_bank, open_firm, decisions) -> None:
     """R1 - Exact: same reference, same amount, date within DATE_TOLERANCE.
     Matched items are removed from open_bank and open_firm."""
     for bank in list(open_bank):              # a copy: we remove from open_bank inside
-        if bank["reference"] is None:
+        firm = _one_by_reference(bank, open_firm)
+        if firm is None:
             continue
-        candidates = [firm for firm in open_firm
-                      if firm["reference"] == bank["reference"]]
-        if len(candidates) != 1:              # none, or several (a group: R3's job)
-            continue
-        firm = candidates[0]
         lag = bank["date"] - firm["expected_date"]
         if firm["amount"] != bank["amount"] or abs(lag) > DATE_TOLERANCE:
             continue
@@ -127,3 +126,80 @@ def _rule_r3(open_bank, open_firm, decisions) -> None:
             })
             open_firm.remove(firm)
         open_bank.remove(bank)
+
+
+def _same_type_or_unknown(bank: dict, firm: dict) -> bool:
+    """Types only rule a candidate out when both sides know their type."""
+    return bank["entry_type"] is None or bank["entry_type"] == firm["entry_type"]
+
+
+def _names_party(description: str, party: str | None) -> bool:
+    """Does the bank's text name this party? True if any word of 3+ letters
+    from the party's name appears as a whole word in the description.
+    Deliberately simple: when it fits two candidates, R4 says NON LIQUET."""
+    if not party:
+        return False
+    words = set(re.findall(r"[A-Z]+", description.upper()))
+    return any(len(word) >= 3 and word in words for word in party.upper().split())
+
+
+def _r4_decision(bank: dict, firm: dict, candidates: list[dict], verdict: str, reason: str) -> dict:
+    """One R4 decision; every R4 decision lists all the candidates it chose between."""
+    return {
+        "bank_id": bank["id"],
+        "firm_id": firm["id"],
+        "verdict": verdict,
+        "rule": "R4",
+        "differences": [],
+        "evidence": {"candidates": [c["id"] for c in candidates],
+                     "lag_days": (bank["date"] - firm["expected_date"]).days,
+                     "reason": reason},
+    }
+
+
+def _rule_r4(open_bank, open_firm, decisions) -> None:
+    """R4 - No reference match: find candidates by amount and date.
+
+    Candidates are open firm items with exactly the same amount, expected
+    within DATE_TOLERANCE, and of the same entry type when the bank line's
+    type is known.
+      - one candidate:  CONGRUIT.
+      - several, and the bank's text names exactly one candidate's client:
+        CONGRUIT with that one, DISCREPAT to each of the others (they stay open).
+      - several, and the text doesn't settle it: NON LIQUET to each candidate;
+        nothing is settled, a person decides.
+    """
+    for bank in list(open_bank):
+        candidates = [firm for firm in open_firm
+                      if firm["amount"] == bank["amount"]
+                      and abs(bank["date"] - firm["expected_date"]) <= DATE_TOLERANCE
+                      and _same_type_or_unknown(bank, firm)]
+        if not candidates:
+            continue
+
+        if len(candidates) == 1:
+            decisions.append(_r4_decision(bank, candidates[0], candidates, "CONGRUIT",
+                                          "only open item with this amount and date"))
+            open_firm.remove(candidates[0])
+            open_bank.remove(bank)
+            continue
+
+        named = [firm for firm in candidates if _names_party(bank["description"], firm["party"])]
+        if len(named) == 1:
+            chosen = named[0]
+            decisions.append(_r4_decision(bank, chosen, candidates, "CONGRUIT",
+                                          f"bank text names {chosen['party']}"))
+            for other in candidates:
+                if other is not chosen:
+                    decisions.append(_r4_decision(
+                        bank, other, candidates, "DISCREPAT",
+                        f"same amount and date, but bank text names {chosen['party']}, "
+                        f"not {other['party']}"))
+            open_firm.remove(chosen)
+            open_bank.remove(bank)
+        else:
+            for firm in candidates:
+                decisions.append(_r4_decision(
+                    bank, firm, candidates, "NON LIQUET",
+                    f"{len(candidates)} candidates with this amount and date; "
+                    "bank text does not name exactly one"))
