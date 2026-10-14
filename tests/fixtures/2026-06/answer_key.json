@@ -42,7 +42,7 @@
         "CE-2026-06-0004"
       ],
       "verdict": "CONGRUIT",
-      "difference": "225.00",
+      "difference": "-225.00",
       "how": "Same dividend reference; bank paid net of 15% withholding tax",
       "break": "B3"
     },
@@ -97,7 +97,7 @@
         "CE-2026-06-0016"
       ],
       "verdict": "CONGRUIT",
-      "difference": "-36.00",
+      "difference": "36.00",
       "how": "One fee transfer covers five client fee entries (reference FEE-2026-06); entries total 1,598.50 against 1,562.50",
       "break": "B6"
     }

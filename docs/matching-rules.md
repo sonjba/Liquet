@@ -63,7 +63,11 @@ Strictest first. A rule either concludes with written evidence or leaves the ite
 
 **R3 - One bank line, several entries.** Several entries share a reference with one bank line (`FEE-2026-06`). Add up the entries and compare with the bank amount. Result: one `CONGRUIT` edge per entry, all to the same bank line, with the total difference recorded in the evidence.
 
-**R4 - No reference match: find candidates.** Take unmatched entries with the same amount and a date within tolerance.
+**R4 - No reference match: find candidates.** Take unmatched entries with exactly the same amount, a date within tolerance, and the same entry type when the bank line's type is known.
+
+- Exactly one candidate: `CONGRUIT`.
+- Several candidates: use the text clue. A candidate fits if any word of 3 or more letters from its client's name appears as a whole word in the bank's description ("NAIR" fits Priya Nair; "NAIRN" does not). If exactly one candidate fits, `CONGRUIT` with that one, and write `DISCREPAT` edges to the others with the reason. They stay unmatched.
+- Several candidates and the clue doesn't settle it (none fits, or more than one does): `NON LIQUET`. Nothing is settled; a person decides.
 
 - Exactly one candidate: `CONGRUIT`.
 - Several candidates: use the text clue (does the bank's description name one candidate's client?). If exactly one fits, `CONGRUIT` with that one, and write `DISCREPAT` edges to the others with the reason.
@@ -159,7 +163,7 @@ June is `EXPLAINED DIFFERENCE` once the person has approved the findings.
 
 1. **Where the line sits between rules and agent.** This draft keeps rules to matching and to explanations that are exact arithmetic or exact dates. Everything that needs judgment goes to the agent. The alternative is to let rules classify "CUSTODY FEE" and "INTEREST" lines too. That would leave the agent almost nothing to do on June, which is a poor test of the agent. Keeping it as drawn gives the agent four real breaks and the decoy to work on.
 2. **Date tolerance.** 1 calendar day fits the June data. Business days is a later refinement.
-3. **How strict the text clue is.** "NAIR P" works because the surname and initial fit exactly one client. How to handle abbreviations that fit two clients is open. The safe default is `NON LIQUET`.
-4. **The answer key's sign convention.** `answer_key.json` records the dividend difference as `225.00` and the fee difference as `-36.00`. With "bank minus firm" the dividend should be `-225.00`. Fix this before using the answer key to evaluate anything.
+3. **How strict the text clue is.** Decided: a 3+ letter word from the client's name, as a whole word in the bank's description. Deliberately simple. An abbreviation that fits two clients ("HART" fits Amelia Hart and the Hart Family Trust) gives `NON LIQUET`. Using initials ("P" for Priya) is a possible refinement.
+4. **The answer key's sign convention.** Fixed: differences are bank minus firm. The dividend is `-225.00` and the fee group `+36.00`.
 5. **Next month (designed, not built).** Findings still open at month end are carried forward. Each run first loads them and looks for their bank line on the new statement. If it's there, a `CLEARED_BY` edge links the finding to that line, which also confirms an in-transit explanation the earlier month could only propose. If not, the finding stays open and is flagged as overdue after one more month. A pattern that repeats can become a rule only if it describes how things normally work (a buy agreed at month end settles next month). A mistake that repeats (the same wrong fee every month) is flagged to be fixed at the source, never turned into a rule. Testing this needs a July fixture.
 6. **Harder months.** June is easy for the rules. To test whether the graph helps the agent, a later month needs breaks the rules can't settle.
