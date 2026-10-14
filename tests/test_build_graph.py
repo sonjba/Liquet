@@ -77,6 +77,17 @@ def test_the_graph_answers_whose_movement_this_is(g):
     assert (portfolio.name, client.properties.get("name")) == ("PF-CL-005", "Hart Family Trust")
 
 
+@pytest.mark.parametrize("node_type", [
+    "Client", "Portfolio", "Account", "AccountBalance", "Security", "Trade", "CashMovement"])
+def test_every_firm_node_says_where_it_came_from(g, node_type):
+    sources = [n.properties.get("source") for n in g.nodes if n.node_type == node_type]
+    assert sources and all(sources)
+
+
+def test_a_movement_traces_back_to_its_place_in_the_firm_data(g):
+    assert g.node("CE-2026-06-0008").properties.get("source").startswith("portfolios/PF-CL-005/")
+
+
 def test_dividend_points_to_its_overseas_security(g):
     [security] = [n for n in g.node("CE-2026-06-0004").out_neighbours if n.node_type == "Security"]
     assert (security.name, security.properties.get("domicile")) == ("ATIT", "overseas")

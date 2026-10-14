@@ -53,6 +53,9 @@ nodes:
       client_id: Stable client identifier, e.g. CL-003.
       name: Client's name.
       client_type: individual or trust.
+      source: >
+        Where in the firm's data this record came from. The firm copies it into
+        several places; the first copy's place is kept.
 
   Portfolio:
     collection: portfolios
@@ -64,6 +67,7 @@ nodes:
       portfolio_id: Stable portfolio identifier, e.g. PF-CL-003.
       client_id: The client who owns the portfolio.
       account_id: The custody account the portfolio's cash is held in.
+      source: Where in the firm's data this record came from.
 
   Account:
     collection: accounts
@@ -76,6 +80,7 @@ nodes:
       account_name: Account name.
       custodian: The bank holding the account.
       currency: Account currency (GBP in v1).
+      source: Where in the firm's data this record came from.
 
   AccountBalance:
     collection: account_balances
@@ -135,6 +140,7 @@ nodes:
       price: Price per unit.
       costs: Trading costs.
       settlement_amount: Cash expected to move on the settlement date.
+      source: Where in the firm's data this record came from.
 
   Security:
     collection: securities
@@ -145,6 +151,9 @@ nodes:
       name: Instrument name.
       security_type: share or fund.
       domicile: uk or overseas. Overseas dividends may arrive net of tax.
+      source: >
+        Where in the firm's data this record came from. The firm copies it into
+        several places; the first copy's place is kept.
 
   # ---------------- bank side ----------------
 

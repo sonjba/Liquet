@@ -22,6 +22,12 @@ Times
     (for June: 31 May), meaning "already known when the month began".
   - Decisions (MATCHED_TO) and findings: run_at, from run.json.
 
+Lineage
+  Every firm node carries `source`: where in the firm's data the record came
+  from (e.g. portfolios/PF-CL-001/cash_movements/0), so any node can be traced
+  back to the received file. A client or security the firm copies into
+  several places keeps the first copy's source.
+
 Property values
   Raphtory fixes each property's type the first time it sees it, so every
   property keeps one type everywhere: money is Decimal, dates are text
@@ -79,30 +85,34 @@ def _add_firm(g: Graph, data: dict, known_from: date) -> None:
     for a in canonical["accounts"]:
         g.add_node(known_from, a["account_id"], node_type="Account",
                    properties={"name": a["account_name"], "custodian": a["custodian"],
-                               "currency": a["currency"]})
+                               "currency": a["currency"], "source": a["source"]})
     for b in canonical["account_balances"]:
         balance_id = f"{b['account_id']}:balance:{b['as_of']}"
         g.add_node(b["as_of"], balance_id, node_type="AccountBalance",
-                   properties={"as_of": b["as_of"], "balance": Decimal(b["balance"])})
+                   properties={"as_of": b["as_of"], "balance": Decimal(b["balance"]),
+                               "source": b["source"]})
         g.add_edge(b["as_of"], b["account_id"], balance_id, layer="HAS_BALANCE")
     for c in canonical["clients"]:
         g.add_node(known_from, c["client_id"], node_type="Client",
-                   properties={"name": c["name"], "client_type": c["client_type"]})
+                   properties={"name": c["name"], "client_type": c["client_type"],
+                               "source": c["source"]})
     for p in canonical["portfolios"]:
-        g.add_node(known_from, p["portfolio_id"], node_type="Portfolio")
+        g.add_node(known_from, p["portfolio_id"], node_type="Portfolio",
+                   properties={"source": p["source"]})
         g.add_edge(known_from, p["client_id"], p["portfolio_id"], layer="OWNS_PORTFOLIO")
         g.add_edge(known_from, p["portfolio_id"], p["account_id"], layer="USES_ACCOUNT")
     for s in canonical["securities"]:
         g.add_node(known_from, s["ticker"], node_type="Security",
                    properties={"name": s["name"], "security_type": s["security_type"],
-                               "domicile": s["domicile"]})
+                               "domicile": s["domicile"], "source": s["source"]})
     for t in canonical["trades"]:
         g.add_node(t["trade_date"], t["trade_id"], node_type="Trade",
                    properties={"side": t["side"], "trade_date": t["trade_date"],
                                "settlement_date": t["settlement_date"],
                                "quantity": t["quantity"], "price": Decimal(t["price"]),
                                "costs": Decimal(t["costs"]),
-                               "settlement_amount": Decimal(t["settlement_amount"])})
+                               "settlement_amount": Decimal(t["settlement_amount"]),
+                               "source": t["source"]})
         g.add_edge(t["trade_date"], t["portfolio_id"], t["trade_id"], layer="HAS_TRADE")
         g.add_edge(t["trade_date"], t["trade_id"], t["ticker"], layer="IN_SECURITY")
 
@@ -116,7 +126,8 @@ def _add_firm(g: Graph, data: dict, known_from: date) -> None:
                                "expected_date": item["expected_date"].isoformat(),
                                "entry_type": entry["entry_type"],
                                "reference": entry["reference"] or "",
-                               "description": entry["description"]})
+                               "description": entry["description"],
+                               "source": entry["source"]})
         g.add_edge(entry["date"], entry["entry_id"], account_id, layer="ON_ACCOUNT")
         if entry["portfolio_id"]:
             g.add_edge(entry["date"], entry["portfolio_id"], entry["entry_id"],
