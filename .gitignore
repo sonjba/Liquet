@@ -4,3 +4,4 @@
 # --- Tests ---
 .pytest_cache/
 __pycache__/
+runs/

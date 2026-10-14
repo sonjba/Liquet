@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bank_prepare import bank_to_item
@@ -12,6 +13,7 @@ from firm_connector import FirmFileConnector
 from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
 from match import match
 from match_checks import check_match_result
+from run_store import save_run
 
 
 def main(args) -> dict:
@@ -84,7 +86,16 @@ if __name__ == "__main__":
     parser.add_argument("--lines", type=Path, required=True, help="bank statement lines (CSV)")
     parser.add_argument("--accounts", type=Path, required=True, help="firm accounts (JSON)")
     parser.add_argument("--portfolios", type=Path, required=True, help="firm portfolios (JSON)")
+    parser.add_argument("--save-to", type=Path,
+                        help="folder for saved runs, e.g. runs (leave out to only print)")
     args = parser.parse_args()
 
     month = main(args)
     show(month)
+
+    # 7. Save the run: the handover to the agent and the person
+    if args.save_to:
+        folder = save_run(month, args.save_to, run_at=datetime.now(timezone.utc),
+                          inputs={"header": args.header, "lines": args.lines,
+                                  "accounts": args.accounts, "portfolios": args.portfolios})
+        print(f"\nSaved to {folder}")
