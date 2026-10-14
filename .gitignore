@@ -1,5 +1,5 @@
-   .venv/
-   .vscode/
-   runs/
-   __pycache__/
-   .pytest_cache/
+.venv/
+.vscode/
+runs/
+__pycache__/
+.pytest_cache/
