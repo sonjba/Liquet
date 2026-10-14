@@ -1,9 +1,5 @@
-# --- Environment variables and secrets ---
-.env
-
-# --- Tests ---
-.pytest_cache/
-__pycache__/
-runs/
-.venv/.vscode/
-.vscode/
+   .venv/
+   .vscode/
+   runs/
+   __pycache__/
+   .pytest_cache/
