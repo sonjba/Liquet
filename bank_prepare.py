@@ -1,23 +1,15 @@
-"""Turn bank lines into Liquet's matching shape.
+"""Turn Liquet bank lines into Liquet's matching shape.
 
 Every item has: id, side, date, expected_date, amount (signed Decimal),
 reference (None if empty), entry_type (None if unknown), description,
 party and domicile (None on the bank side: the bank's text is in description).
 firm_prepare.py gives firm entries the same shape.
+
+The lines come in Liquet's format (bank_reader.py already set reference and
+entry_type), so nothing here knows anything about a particular bank.
 """
 
 from __future__ import annotations
-
-from bank_mapping import BANK_DESCRIPTION_TYPES
-
-
-def bank_entry_type(description: str) -> str | None:
-    """The entry type for a bank description, or None if no rule fits."""
-    text = description.strip().upper()
-    for start, entry_type in BANK_DESCRIPTION_TYPES:
-        if text.startswith(start):
-            return entry_type
-    return None
 
 
 def bank_to_item(line: dict) -> dict:
@@ -28,9 +20,14 @@ def bank_to_item(line: dict) -> dict:
         "date": line["date"],
         "expected_date": line["date"],   # the bank's date is when money moved
         "amount": line["amount"],
-        "reference": line["reference"].strip() or None,
-        "entry_type": bank_entry_type(line["description"]),
+        "reference": line["reference"],
+        "entry_type": line["entry_type"],
         "description": line["description"],
         "party": None,                   # the bank's text is in description
         "domicile": None,
     }
+
+
+def bank_items(statement: dict) -> list[dict]:
+    """Every line of a stored bank statement ({"header", "lines"}) as an item."""
+    return [bank_to_item(line) for line in statement["lines"]]

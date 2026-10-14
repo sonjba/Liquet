@@ -57,3 +57,12 @@ def parties_by_portfolio(canonical: dict) -> dict[str, str]:
 def domiciles_by_ticker(canonical: dict) -> dict[str, str]:
     """{ticker: "uk" or "overseas"}, so R2a can tell an overseas dividend."""
     return {s["ticker"]: s["domicile"] for s in canonical["securities"]}
+
+
+def firm_items(canonical: dict, entries: list[dict]) -> list[dict]:
+    """The month's cash entries as matching items, using the canonical
+    collections for trades (settlement dates), clients and securities."""
+    trades = {t["trade_id"]: t for t in canonical["trades"]}
+    parties = parties_by_portfolio(canonical)
+    domiciles = domiciles_by_ticker(canonical)
+    return [firm_to_item(entry, trades, parties, domiciles) for entry in entries]

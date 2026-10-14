@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import bank_reader
-from bank_prepare import bank_entry_type, bank_to_item
+from bank_prepare import bank_items, bank_to_item
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 ITEM_KEYS = {"id", "side", "date", "expected_date", "amount",
@@ -19,28 +19,11 @@ def june_items():
     return [bank_to_item(line) for line in lines]
 
 
-# ---------------- bank_entry_type ----------------
-
-@pytest.mark.parametrize("description, expected", [
-    ("SUBSCRIPTION CL-001 HART A", "SUBSCRIPTION"),
-    ("SETTLEMENT BUY 400 ALBN", "TRADE_SETTLEMENT"),
-    ("DIVIDEND ATIT NET OF TAX", "DIVIDEND"),
-    ("WITHDRAWAL CL-004 REID T", "WITHDRAWAL"),
-    ("TRANSFER KRW FEE ACCOUNT", "MANAGEMENT_FEE"),
-    ("CUSTODY FEE JUNE", "CUSTODY_FEE"),
-    ("CREDIT INTEREST JUNE", "INTEREST"),
-    ("FASTER PAYMENT NAIR P", None),
-])
-def test_june_descriptions_get_the_right_type(description, expected):
-    assert bank_entry_type(description) == expected
-
-
-def test_case_and_spaces_do_not_matter():
-    assert bank_entry_type("  dividend atit ") == "DIVIDEND"
-
-
-def test_only_the_start_of_the_description_counts():
-    assert bank_entry_type("REVERSAL OF DIVIDEND") is None
+@pytest.fixture(scope="module")
+def june_statement():
+    header, lines = bank_reader.read_statement(JUNE / "statement_header.json",
+                                               JUNE / "bank_statement.csv")
+    return {"header": header, "lines": lines}
 
 
 # ---------------- bank_to_item ----------------
@@ -70,3 +53,17 @@ def test_settlement_line_is_prepared_correctly(june_items):
 
 def test_line_without_reference_gets_none(june_items):
     assert june_items[-1]["reference"] is None
+
+
+def test_type_and_reference_come_from_the_line_as_they_are():
+    # bank_prepare decides nothing about a bank's wording: whatever the door
+    # put on the line is what the item gets.
+    line = {"line_id": "X:L2", "date": date(2026, 6, 1), "amount": Decimal("1.00"),
+            "reference": None, "entry_type": "SOMETHING_NEW",
+            "description": "DIVIDEND ATIT"}
+    item = bank_to_item(line)
+    assert (item["entry_type"], item["reference"]) == ("SOMETHING_NEW", None)
+
+
+def test_bank_items_prepares_every_line_of_a_statement(june_statement, june_items):
+    assert bank_items(june_statement) == june_items

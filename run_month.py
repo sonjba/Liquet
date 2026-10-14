@@ -1,4 +1,21 @@
-"""Run Liquet for one month: read both sides, check them, prepare them, match them."""
+"""Run Liquet for one month, stage by stage (docs/pipeline.md draws the stages).
+
+    receive  -> fingerprint the files that arrived
+    ingest   -> THE DOOR: read the bank's and the firm's files into Liquet's format, check them
+    store    -> keep the received files and the Liquet-format data in a new run folder,
+                then read the data back from there
+    prepare  -> both sides in one matching shape
+    match    -> rules R1-R5 (and R2a)
+    check    -> nothing matched twice, nothing lost
+    save     -> decisions, findings, leftovers, and run.json last
+
+Only `ingest` knows the outside formats. Every stage after `store` uses the
+data read back from the run folder, so what is stored is provably what
+matching used. A new bank or firm changes `ingest` (its readers and
+mappings) and nothing else.
+
+    python run_month.py --header ... --lines ... --accounts ... --portfolios ...
+"""
 
 from __future__ import annotations
 
@@ -6,48 +23,79 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bank_prepare import bank_to_item
+from bank_prepare import bank_items
 from bank_reader import read_statement
 from firm_checks import check_canonical
 from firm_connector import FirmFileConnector
-from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
+from firm_prepare import firm_items
 from match import match
 from match_checks import check_match_result
-from run_store import save_run
+from run_store import (fingerprints, load_data, new_run_folder, save_data, save_received,
+                       save_results)
+
+STAGES = ["receive", "ingest", "store", "prepare", "match", "check", "save"]
 
 
-def main(args) -> dict:
-    """Run every step in order. All data lives in `month`."""
-    month = {}
+# ---------------- the door: the only stage that knows outside formats ----------------
 
-    # 1. Bank: header + lines (read, checked, with ids)
-    month["header"], month["lines"] = read_statement(args.header, args.lines)
+def ingest(sources: dict[str, Path]) -> dict:
+    """Read the bank's and the firm's files and return them in Liquet's format,
+    checked. Each side's reader runs its own checks and stops on a problem."""
+    header, lines = read_statement(sources["header"], sources["lines"])
+    firm = FirmFileConnector(sources["accounts"], sources["portfolios"])
+    check_canonical(firm.canonical, header["period_start"])
+    entries = firm.get_cash_entries(header["account_id"],
+                                    header["period_start"], header["period_end"])
+    return {"bank_statement": {"header": header, "lines": lines},
+            "firm_canonical": firm.canonical,
+            "firm_cash_entries": entries}
 
-    # 2. Firm: all collections, checked
-    firm = FirmFileConnector(args.accounts, args.portfolios)
-    check_canonical(firm.canonical, month["header"]["period_start"])
-    month["firm"] = firm.canonical
 
-    # 3. Firm entries for this account and month
-    month["entries"] = firm.get_cash_entries(month["header"]["account_id"],
-                                             month["header"]["period_start"],
-                                             month["header"]["period_end"])
+# ---------------- store: keep it, then work only from what was kept ----------------
 
-    # 4. Prepare both sides in the same shape for matching
-    trades = {t["trade_id"]: t for t in month["firm"]["trades"]}
-    month["bank_items"] = [bank_to_item(line) for line in month["lines"]]
-    parties = parties_by_portfolio(month["firm"])
-    domiciles = domiciles_by_ticker(month["firm"])
-    month["firm_items"] = [firm_to_item(entry, trades, parties, domiciles)
-                           for entry in month["entries"]]
+def store(runs_dir: Path, sources: dict[str, Path], read_fingerprints: dict[str, str],
+          data: dict) -> tuple[Path, dict, dict]:
+    """Make the run folder, copy in the received files, save the Liquet data,
+    and read the data back. Returns (folder, received, data as stored)."""
+    folder = new_run_folder(runs_dir, data["bank_statement"]["header"])
+    received = save_received(folder, sources, read_fingerprints)
+    save_data(folder, data)
+    stored = load_data(folder)
+    if stored != data:
+        raise ValueError(f"{folder}/data: reading the saved data back does not give "
+                         f"the same data; stopping before matching")
+    return folder, received, stored
 
-    # 5. Match: pair bank items with firm items, rule by rule
+
+# ---------------- the whole month ----------------
+
+def main(sources: dict[str, Path], runs_dir: Path, run_at: datetime) -> dict:
+    """Run every stage in order. All data lives in `month`."""
+    month = {"run_at": run_at}
+
+    # 1. receive
+    read_fingerprints = fingerprints(sources)
+
+    # 2. ingest (the door)
+    ingested = ingest(sources)
+
+    # 3. store, and from here on use only what was stored
+    month["folder"], received, data = store(runs_dir, sources, read_fingerprints, ingested)
+    month["header"] = data["bank_statement"]["header"]
+
+    # 4. prepare both sides in the same shape for matching
+    month["bank_items"] = bank_items(data["bank_statement"])
+    month["firm_items"] = firm_items(data["firm_canonical"], data["firm_cash_entries"])
+
+    # 5. match
     month["result"] = match(month["bank_items"], month["firm_items"],
                             period_end=month["header"]["period_end"])
 
-    # 6. Check the result: nothing matched twice, nothing lost (stops the run if not)
+    # 6. check: nothing matched twice, nothing lost (stops the run if not)
     check_match_result(month["bank_items"], month["firm_items"], month["result"])
 
+    # 7. save the results: the handover to the agent and the person
+    save_results(month["folder"], month["header"], month["result"], run_at, received, STAGES)
     return month
 
 
@@ -78,6 +126,7 @@ def show(month: dict) -> None:
 
     print(f"\nUnmatched bank: {[i['id'].split(':')[-1] for i in result['unmatched_bank']]}")
     print(f"Unmatched firm: {[i['id'] for i in result['unmatched_firm']]}")
+    print(f"\nSaved to {month['folder']}")
 
 
 if __name__ == "__main__":
@@ -86,16 +135,10 @@ if __name__ == "__main__":
     parser.add_argument("--lines", type=Path, required=True, help="bank statement lines (CSV)")
     parser.add_argument("--accounts", type=Path, required=True, help="firm accounts (JSON)")
     parser.add_argument("--portfolios", type=Path, required=True, help="firm portfolios (JSON)")
-    parser.add_argument("--save-to", type=Path,
-                        help="folder for saved runs, e.g. runs (leave out to only print)")
+    parser.add_argument("--runs", type=Path, default=Path("runs"),
+                        help="folder that holds every run (default: runs)")
     args = parser.parse_args()
 
-    month = main(args)
-    show(month)
-
-    # 7. Save the run: the handover to the agent and the person
-    if args.save_to:
-        folder = save_run(month, args.save_to, run_at=datetime.now(timezone.utc),
-                          inputs={"header": args.header, "lines": args.lines,
-                                  "accounts": args.accounts, "portfolios": args.portfolios})
-        print(f"\nSaved to {folder}")
+    sources = {"header": args.header, "lines": args.lines,
+               "accounts": args.accounts, "portfolios": args.portfolios}
+    show(main(sources, args.runs, run_at=datetime.now(timezone.utc)))

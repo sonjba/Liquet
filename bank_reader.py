@@ -8,13 +8,17 @@ Current version (v1, deliberately simple):
   amounts, negative paid_in/paid_out, NaN, more than two decimal places.
 - Checks: totals, running balance, dates within the statement period.
 
+This file and bank_mapping.py are the bank side of Liquet's door: the only
+code that knows how this bank writes its files. What leaves read_statement()
+is in Liquet's format; nothing after it reads the bank's own files or wording.
+A new bank means a new reader + mapping here, and nothing else changes.
+
 Not yet (planned):
 - Other input formats (PDF, Excel, MT940, camt.053) through a separate reader
   that produces the same lines.
 - Header and lines in one file, as real statements have.
 - Lines as dataclasses instead of dictionaries.
 - Currencies other than GBP.
-- Checking continuity between months (this opening = last month's closing).
 """
 
 
@@ -25,7 +29,8 @@ import json
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from bank_mapping import HEADER_FIELDS,COLUMNS
+
+from bank_mapping import BANK_DESCRIPTION_TYPES, COLUMNS, HEADER_FIELDS
 
 def parse_money(text: str, where: str, allow_negative: bool = False) -> Decimal | None:
     text = text.strip()
@@ -78,6 +83,19 @@ def read_header(header_path: Path) -> dict:
 
 
 
+def bank_entry_type(description: str) -> str | None:
+    """The entry type for this bank's description, or None if no rule fits.
+
+    The wording is this bank's ("TRANSFER KRW FEE ..."), so the table lives in
+    bank_mapping.py and is used only here, at the door. After this, Liquet
+    only sees entry_type."""
+    text = description.strip().upper()
+    for start, entry_type in BANK_DESCRIPTION_TYPES:
+        if text.startswith(start):
+            return entry_type
+    return None
+
+
 def read_lines(lines_path: Path) -> list[dict]:
     lines = []
     with open(lines_path, "r", encoding="utf-8-sig", newline="") as lines_data:
@@ -107,6 +125,11 @@ def read_lines(lines_path: Path) -> list[dict]:
                 line["amount"] = line["paid_in"]
             else:
                 line["amount"] = -line["paid_out"]
+
+            # In Liquet's format "no reference" is None, and every line says what
+            # kind of movement it is (None if this bank's wording isn't known).
+            line["reference"] = line["reference"].strip() or None
+            line["entry_type"] = bank_entry_type(line["description"])
 
             lines.append(line)
     return lines
