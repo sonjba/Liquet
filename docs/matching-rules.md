@@ -57,7 +57,7 @@ Strictest first. A rule either concludes with written evidence or leaves the ite
 
 **R1 - Exact.** References equal, amounts equal, bank date within tolerance of the expected date. Result: `CONGRUIT`, no differences. If the date differs by a day, the lag goes into the evidence.
 
-**R2 - Same reference, amount differs.** References equal, exactly one counterpart, amounts differ. Result: `CONGRUIT`, with the amount difference listed. Then one exact check:
+**R2 - Same reference, amount differs.** References equal, exactly one counterpart, amounts differ. Money moving the same way, and the date within tolerance. Result: `CONGRUIT`, with the amount difference listed. Then one exact check:
 
 - **R2a - Withholding tax.** If the entry is a dividend, the security is overseas, and the difference is exactly 15% of the firm's amount, write a Finding: `OMISSUM / WITHHOLDING_TAX`. This is plain arithmetic with nothing to judge.
 
@@ -73,7 +73,7 @@ Strictest first. A rule either concludes with written evidence or leaves the ite
 - Several candidates: use the text clue (does the bank's description name one candidate's client?). If exactly one fits, `CONGRUIT` with that one, and write `DISCREPAT` edges to the others with the reason.
 - Several candidates and the clue doesn't settle it: `NON LIQUET`.
 
-**R5 - Settlement after the period.** An unmatched trade-settlement entry whose settlement date is after the statement's end date, with no bank line. Result: Finding `IN_TRANSITU / OUTSTANDING_PAYMENT`. This is fully determined by the dates.
+**R5 - Settlement after the period.** An unmatched trade-settlement entry whose settlement date is after the statement's end date, with no bank line. Result: Finding `IN_TRANSITU / OUTSTANDING_PAYMENT/OUTSTANDING_RECEIPT`. OUTSTANDING_PAYMENT for money out, OUTSTANDING_RECEIPT for money in. This is fully determined by the dates.
 
 **Everything else goes to the agent.** Whatever is still unexplained after R1-R5 is the agent's job. It uses controlled, read-only tools and cannot change any record. See section 7.
 
@@ -90,7 +90,7 @@ Strictest first. A rule either concludes with written evidence or leaves the ite
 | 8 FASTER PAYMENT NAIR P | CE-0007 | R4: two £5,000 candidates (CE-0007, CE-0008); "NAIR P" names Priya Nair | CONGRUIT with CE-0007. **DISCREPAT** edge to CE-0008. |
 | 9 SUBSCRIPTION CL-002 | CE-0009 | R1 | CONGRUIT |
 | 10 SETTLEMENT SELL 600 ALBN | CE-0010 | R1, settlement date 26 June | CONGRUIT |
-| 11 TRANSFER FEE-2026-06 | CE-0012 to CE-0016 | R3 | CONGRUIT for all five, difference **-36.00** in total. Needs an explanation (agent). |
+| 11 TRANSFER FEE-2026-06 | CE-0012 to CE-0016 | R3 | CONGRUIT for all five, difference **36.00** in total. Needs an explanation (agent). |
 | 12 CUSTODY FEE | none | none | No edge. Agent proposes: omission, bank fee (B4). |
 | 13 CREDIT INTEREST | none | none | No edge. Agent proposes: omission, interest (B5). |
 | none | CE-0011 (buy 300 ALBN) | R5: settles 1 July, after 30 June | Finding B2: in transit. |
