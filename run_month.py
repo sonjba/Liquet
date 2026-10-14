@@ -9,8 +9,9 @@ from bank_prepare import bank_to_item
 from bank_reader import read_statement
 from firm_checks import check_canonical
 from firm_connector import FirmFileConnector
-from firm_prepare import firm_to_item, parties_by_portfolio
+from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
 from match import match
+from match_checks import check_match_result
 
 
 def main(args) -> dict:
@@ -34,11 +35,16 @@ def main(args) -> dict:
     trades = {t["trade_id"]: t for t in month["firm"]["trades"]}
     month["bank_items"] = [bank_to_item(line) for line in month["lines"]]
     parties = parties_by_portfolio(month["firm"])
-    month["firm_items"] = [firm_to_item(entry, trades, parties) for entry in month["entries"]]
+    domiciles = domiciles_by_ticker(month["firm"])
+    month["firm_items"] = [firm_to_item(entry, trades, parties, domiciles)
+                           for entry in month["entries"]]
 
     # 5. Match: pair bank items with firm items, rule by rule
     month["result"] = match(month["bank_items"], month["firm_items"],
                             period_end=month["header"]["period_end"])
+
+    # 6. Check the result: nothing matched twice, nothing lost (stops the run if not)
+    check_match_result(month["bank_items"], month["firm_items"], month["result"])
 
     return month
 

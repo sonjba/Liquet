@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import re
 from datetime import date, timedelta
+from decimal import Decimal
 
 DATE_TOLERANCE = timedelta(days=1)
+
+# R2a: the withholding tax rate the fixture's overseas dividends are paid net of.
+# Real rates depend on the country and any tax treaty; v1 uses one fixed rate.
+WITHHOLDING_TAX_RATE = Decimal("0.15")
 
 
 def match(bank_items: list[dict], firm_items: list[dict], period_end: date) -> dict:
@@ -20,7 +25,7 @@ def match(bank_items: list[dict], firm_items: list[dict], period_end: date) -> d
     findings = []
 
     _rule_r1(open_bank, open_firm, decisions)
-    _rule_r2(open_bank, open_firm, decisions)
+    _rule_r2(open_bank, open_firm, decisions, findings)
     _rule_r3(open_bank, open_firm, decisions)
     _rule_r4(open_bank, open_firm, decisions)
     _rule_r5(open_firm, period_end, findings)
@@ -62,13 +67,14 @@ def _rule_r1(open_bank, open_firm, decisions) -> None:
         open_firm.remove(firm)
 
 
-def _rule_r2(open_bank, open_firm, decisions) -> None:
+def _rule_r2(open_bank, open_firm, decisions, findings) -> None:
     """R2 - Same reference, amount differs: the same transaction, with a difference.
 
     Same reference, exactly one candidate, money moving the same way (both in
     or both out), date within DATE_TOLERANCE, amounts differ. Verdict CONGRUIT;
     the amount difference (bank minus firm) goes into `differences`.
-    Explaining the difference (R2a, or the agent) is a separate step.
+    If R2a recognises the difference as withholding tax, it adds a Finding;
+    any other difference is left for the agent to explain.
     """
     for bank in list(open_bank):
         firm = _one_by_reference(bank, open_firm)
@@ -89,8 +95,39 @@ def _rule_r2(open_bank, open_firm, decisions) -> None:
                              "difference": bank["amount"] - firm["amount"]}],
             "evidence": {"reference": bank["reference"], "lag_days": lag.days},
         })
+        _rule_r2a(bank, firm, findings)
         open_bank.remove(bank)
         open_firm.remove(firm)
+
+
+def _rule_r2a(bank: dict, firm: dict, findings) -> None:
+    """R2a - Withholding tax: an overseas dividend paid net of tax.
+
+    The entry is a dividend, its security is overseas, and the bank paid
+    exactly WITHHOLDING_TAX_RATE less than the firm recorded. Plain arithmetic,
+    nothing to judge: a Finding OMISSUM / WITHHOLDING_TAX, adjusting the book
+    (the firm hasn't recorded the tax). Status PROPOSED: a person approves it.
+    """
+    if firm["entry_type"] != "DIVIDEND" or firm["domicile"] != "overseas":
+        return
+    tax = firm["amount"] - bank["amount"]
+    if tax != firm["amount"] * WITHHOLDING_TAX_RATE:
+        return
+    findings.append({
+        "finding_id": f"R2a:{firm['id']}",
+        "rule": "R2a",
+        "category": "OMISSUM",
+        "type": "WITHHOLDING_TAX",
+        "firm_ids": [firm["id"]],
+        "bank_ids": [bank["id"]],
+        "adjusts": "book",
+        "adjustment": -tax,
+        "evidence": {"gross": firm["amount"], "net_paid": bank["amount"],
+                     "tax": tax, "rate": WITHHOLDING_TAX_RATE},
+        "status": "PROPOSED",
+        "proposed_by": "R2a",
+        "decided_by": None,
+    })
 
 
 def _rule_r3(open_bank, open_firm, decisions) -> None:

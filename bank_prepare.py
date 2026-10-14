@@ -2,7 +2,7 @@
 
 Every item has: id, side, date, expected_date, amount (signed Decimal),
 reference (None if empty), entry_type (None if unknown), description,
-party (None on the bank side: the bank's text is in description).
+party and domicile (None on the bank side: the bank's text is in description).
 firm_prepare.py gives firm entries the same shape.
 """
 
@@ -32,4 +32,5 @@ def bank_to_item(line: dict) -> dict:
         "entry_type": bank_entry_type(line["description"]),
         "description": line["description"],
         "party": None,                   # the bank's text is in description
+        "domicile": None,
     }

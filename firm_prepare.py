@@ -31,7 +31,8 @@ def expected_date(entry: dict, trades: dict[str, dict]) -> date:
     return date.fromisoformat(entry["date"])
 
 
-def firm_to_item(entry: dict, trades: dict[str, dict], parties: dict[str, str]) -> dict:
+def firm_to_item(entry: dict, trades: dict[str, dict], parties: dict[str, str],
+                 domiciles: dict[str, str]) -> dict:
     """One firm cash entry as a matching item."""
     return {
         "id": entry["entry_id"],
@@ -43,6 +44,7 @@ def firm_to_item(entry: dict, trades: dict[str, dict], parties: dict[str, str]) 
         "entry_type": entry["entry_type"],
         "description": entry["description"],
         "party": parties.get(entry["portfolio_id"]),   # None: an account entry, no client
+        "domicile": domiciles.get(entry["ticker"]),    # None: no security (only dividends have one)
     }
 
 
@@ -50,3 +52,8 @@ def parties_by_portfolio(canonical: dict) -> dict[str, str]:
     """{portfolio_id: the client's name}, so matching can read whose money it is."""
     names = {c["client_id"]: c["name"] for c in canonical["clients"]}
     return {p["portfolio_id"]: names[p["client_id"]] for p in canonical["portfolios"]}
+
+
+def domiciles_by_ticker(canonical: dict) -> dict[str, str]:
+    """{ticker: "uk" or "overseas"}, so R2a can tell an overseas dividend."""
+    return {s["ticker"]: s["domicile"] for s in canonical["securities"]}

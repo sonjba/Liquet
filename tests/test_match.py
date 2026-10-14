@@ -7,7 +7,7 @@ import pytest
 from bank_prepare import bank_to_item
 from bank_reader import read_statement
 from firm_connector import FirmFileConnector
-from firm_prepare import firm_to_item, parties_by_portfolio
+from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
 from match import match
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
@@ -21,7 +21,8 @@ def _item(side: str, item_id: str, **changes) -> dict:
     item = {"id": item_id, "side": side,
             "date": date(2026, 6, 10), "expected_date": date(2026, 6, 10),
             "amount": Decimal("100.00"), "reference": "REF-1",
-            "entry_type": "SUBSCRIPTION", "description": "test", "party": None}
+            "entry_type": "SUBSCRIPTION", "description": "test", "party": None,
+            "domicile": None}
     item.update(changes)
     return item
 
@@ -34,20 +35,17 @@ def _firm(item_id: str = "F1", **changes) -> dict:
     return _item("firm", item_id, **changes)
 
 
-def _pairs(result: dict) -> dict[str, str]:
-    """{bank_id: firm_id} for every decision."""
-    return {d["bank_id"]: d["firm_id"] for d in result["decisions"]}
-
-
 @pytest.fixture(scope="module")
 def june_result():
     header, lines = read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
     firm = FirmFileConnector(JUNE / "firm" / "accounts.json", JUNE / "firm" / "portfolios.json")
     trades = {t["trade_id"]: t for t in firm.canonical["trades"]}
     parties = parties_by_portfolio(firm.canonical)
+    domiciles = domiciles_by_ticker(firm.canonical)
     entries = firm.get_cash_entries(header["account_id"], header["period_start"], header["period_end"])
-    return _match([bank_to_item(line) for line in lines],
-                 [firm_to_item(entry, trades, parties) for entry in entries])
+    return match([bank_to_item(line) for line in lines],
+                 [firm_to_item(entry, trades, parties, domiciles) for entry in entries],
+                 period_end=header["period_end"])
 
 
 def _match(bank_items: list[dict], firm_items: list[dict]) -> dict:
@@ -330,12 +328,16 @@ def test_r4_name_must_be_a_whole_word():
 
 # ---------------- R5: settlement after the period ----------------
 
+def _findings_by_rule(result: dict, rule: str) -> list[dict]:
+    return [f for f in result["findings"] if f["rule"] == rule]
+
+
 def test_r5_finds_the_buy_that_settles_in_july(june_result):
-    assert [f["firm_ids"] for f in june_result["findings"]] == [["CE-2026-06-0011"]]
+    assert [f["firm_ids"] for f in _findings_by_rule(june_result, "R5")] == [["CE-2026-06-0011"]]
 
 
 def test_r5_finding_is_an_outstanding_payment_adjusting_the_bank(june_result):
-    finding = june_result["findings"][0]
+    finding = _findings_by_rule(june_result, "R5")[0]
     assert finding["rule"] == "R5"
     assert finding["category"] == "IN_TRANSITU"
     assert finding["type"] == "OUTSTANDING_PAYMENT"
@@ -346,7 +348,7 @@ def test_r5_finding_is_an_outstanding_payment_adjusting_the_bank(june_result):
 
 
 def test_r5_finding_waits_for_a_person(june_result):
-    finding = june_result["findings"][0]
+    finding = _findings_by_rule(june_result, "R5")[0]
     assert finding["status"] == "PROPOSED"
     assert finding["decided_by"] is None
 
@@ -379,3 +381,52 @@ def test_r5_sale_settling_next_month_is_an_outstanding_receipt():
 def test_r5_entry_with_a_finding_leaves_the_open_list():
     result = _match([], [_settlement()])
     assert result["unmatched_firm"] == []
+
+
+# ---------------- R2a: withholding tax ----------------
+
+def test_r2a_explains_the_june_dividend_as_withholding_tax(june_result):
+    [finding] = _findings_by_rule(june_result, "R2a")
+    assert finding["category"] == "OMISSUM"
+    assert finding["type"] == "WITHHOLDING_TAX"
+    assert finding["firm_ids"] == ["CE-2026-06-0004"]
+    assert [_short(b) for b in finding["bank_ids"]] == ["L5"]
+
+
+def test_r2a_adjusts_the_book_by_the_tax(june_result):
+    # 1,500.00 gross, 1,275.00 paid: the firm hasn't recorded 225.00 of tax.
+    [finding] = _findings_by_rule(june_result, "R2a")
+    assert finding["adjusts"] == "book"
+    assert finding["adjustment"] == Decimal("-225.00")
+    assert finding["evidence"]["tax"] == Decimal("225.00")
+    assert finding["status"] == "PROPOSED"
+
+
+def _dividend(**changes) -> dict:
+    """An overseas dividend of 1,000.00 expected in June; change only what a test needs."""
+    fields = {"entry_type": "DIVIDEND", "domicile": "overseas", "amount": Decimal("1000.00")}
+    fields.update(changes)
+    return _firm(**fields)
+
+
+def test_r2a_needs_exactly_the_tax_rate():
+    exact = _match([_bank(amount=Decimal("850.00"))], [_dividend()])
+    off_by_a_penny = _match([_bank(amount=Decimal("850.01"))], [_dividend()])
+    assert [f["rule"] for f in exact["findings"]] == ["R2a"]
+    assert off_by_a_penny["findings"] == []
+
+
+def test_r2a_needs_an_overseas_security():
+    result = _match([_bank(amount=Decimal("850.00"))], [_dividend(domicile="uk")])
+    assert result["findings"] == []
+
+
+def test_r2a_only_applies_to_dividends():
+    result = _match([_bank(amount=Decimal("850.00"))],
+                    [_dividend(entry_type="SUBSCRIPTION")])
+    assert result["findings"] == []
+
+
+def test_r2a_still_leaves_the_r2_match_in_place():
+    result = _match([_bank(amount=Decimal("850.00"))], [_dividend()])
+    assert [(d["rule"], d["verdict"]) for d in result["decisions"]] == [("R2", "CONGRUIT")]
