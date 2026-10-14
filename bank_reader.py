@@ -22,11 +22,10 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from bank_mapping import HEADER_FIELDS,COLUMNS
-
 
 def parse_money(text: str, where: str, allow_negative: bool = False) -> Decimal | None:
     text = text.strip()
@@ -171,6 +170,45 @@ def read_statement(header_path: Path, lines_path: Path) -> tuple[dict, list[dict
             raise ValueError(f"Statement check failed: {message}")
     add_ids(header, lines)
     return header, lines
+
+
+def check_continuity(headers: list[dict]) -> list[str]:
+    """Check that consecutive statements for one account follow on without a gap.
+
+    For each statement after the first, compared with the one before:
+      - same account;
+      - the period starts the day after the previous one ended
+        (a gap means a missing statement, an overlap a duplicated one);
+      - the opening balance equals the previous closing balance, exactly.
+
+    `headers` are read_header() results in date order, oldest first.
+    Returns a list of problems; empty means the statements chain correctly.
+    One statement on its own has nothing to chain with, so it passes.
+
+    Idea from verify_continuity in bankstatementparser (Sebastien Rousseau);
+    Liquet compares to the penny with no tolerance, since its balances are
+    read as Decimal, never estimated.
+    """
+    problems = []
+    for i in range(1, len(headers)):
+        previous, current = headers[i - 1], headers[i]
+        label = f"{previous['period_end']} -> {current['period_start']}"
+        if current["account_id"] != previous["account_id"]:
+            problems.append(f"{label}: account changes from {previous['account_id']} "
+                            f"to {current['account_id']}")
+            continue
+        expected_start = previous["period_end"] + timedelta(days=1)
+        if current["period_start"] > expected_start:
+            problems.append(f"{label}: gap, no statement for {expected_start} to "
+                            f"{current['period_start'] - timedelta(days=1)}")
+        elif current["period_start"] < expected_start:
+            problems.append(f"{label}: overlap, both statements cover "
+                            f"{current['period_start']} to {previous['period_end']}")
+        if current["opening_balance"] != previous["closing_balance"]:
+            problems.append(f"{label}: opening balance {current['opening_balance']} "
+                            f"does not equal previous closing balance "
+                            f"{previous['closing_balance']}")
+    return problems
 
 
 if __name__ == "__main__":
