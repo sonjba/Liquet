@@ -127,13 +127,13 @@ def test_results_and_run_json_are_written(header, tmp_path):
     assert info["counts"] == {"decisions": 1, "findings": 1, "leftover_bank": 0,
                               "leftover_firm": 1}
     assert run["decisions"][0]["differences"][0]["difference"] == "-225.00"
-    assert run["findings"][0]["created_at"] == "2026-07-02T09:30:00+00:00"
+    assert run["findings"][0]["proposed_at"] == "2026-07-02T09:30:00+00:00"
 
 
 def test_saving_does_not_change_the_result_in_memory(header, tmp_path):
     result = _result()
     save_results(tmp_path, header, result, RUN_AT, received={}, stages=[])
-    assert "created_at" not in result["findings"][0]
+    assert "proposed_at" not in result["findings"][0]
 
 
 def test_a_run_without_run_json_did_not_finish(tmp_path):

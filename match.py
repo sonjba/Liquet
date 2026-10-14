@@ -122,6 +122,9 @@ def _rule_r2a(bank: dict, firm: dict, findings) -> None:
         "bank_ids": [bank["id"]],
         "adjusts": "book",
         "adjustment": -tax,
+        "explanation": (f"Overseas dividend paid net of {WITHHOLDING_TAX_RATE:.0%} withholding "
+                        f"tax: {firm['amount']} gross, {bank['amount']} paid. The tax of "
+                        f"{tax} is not in the cash book."),
         "evidence": {"gross": firm["amount"], "net_paid": bank["amount"],
                      "tax": tax, "rate": WITHHOLDING_TAX_RATE},
         "status": "PROPOSED",
@@ -271,6 +274,10 @@ def _rule_r5(open_firm, period_end: date, findings) -> None:
             "bank_ids": [],
             "adjusts": "bank",
             "adjustment": firm["amount"],
+            "explanation": (f"Trade {firm['reference']} settles on {firm['expected_date']}, after "
+                            f"the statement ends on {period_end}: the "
+                            f"{'payment' if firm['amount'] < 0 else 'receipt'} of "
+                            f"{abs(firm['amount'])} reaches the bank next period."),
             "evidence": {"reference": firm["reference"],
                          "settlement_date": firm["expected_date"],
                          "period_end": period_end},

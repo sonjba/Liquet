@@ -13,7 +13,7 @@ without touching the earlier run:
             firm_canonical.json
             firm_cash_entries.json
         decisions.json            every R1-R4 decision
-        findings.json             every Finding, stamped with created_at
+        findings.json             every Finding, stamped with proposed_at
         leftovers.json            the bank and firm items no rule could settle
         run.json                  written last: when it ran, the statement,
                                   the received files and their fingerprints,
@@ -163,7 +163,7 @@ def save_results(folder: Path, header: dict, result: dict, run_at: datetime,
                    "leftover_bank": len(result["unmatched_bank"]),
                    "leftover_firm": len(result["unmatched_firm"])},
     }
-    findings = [dict(finding, created_at=run_at.isoformat()) for finding in result["findings"]]
+    findings = [dict(finding, proposed_at=run_at.isoformat()) for finding in result["findings"]]
     leftovers = {"bank": result["unmatched_bank"], "firm": result["unmatched_firm"]}
 
     _write(folder / "decisions.json", result["decisions"])

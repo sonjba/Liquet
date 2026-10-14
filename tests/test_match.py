@@ -347,6 +347,13 @@ def test_r5_finding_is_an_outstanding_payment_adjusting_the_bank(june_result):
     assert finding["evidence"]["reference"] == "TR-26062901"
 
 
+def test_r5_finding_explains_itself_in_words(june_result):
+    finding = _findings_by_rule(june_result, "R5")[0]
+    assert finding["explanation"] == (
+        "Trade TR-26062901 settles on 2026-07-01, after the statement ends on 2026-06-30: "
+        "the payment of 3717.00 reaches the bank next period.")
+
+
 def test_r5_finding_waits_for_a_person(june_result):
     finding = _findings_by_rule(june_result, "R5")[0]
     assert finding["status"] == "PROPOSED"
@@ -400,6 +407,13 @@ def test_r2a_adjusts_the_book_by_the_tax(june_result):
     assert finding["adjustment"] == Decimal("-225.00")
     assert finding["evidence"]["tax"] == Decimal("225.00")
     assert finding["status"] == "PROPOSED"
+
+
+def test_r2a_finding_explains_itself_in_words(june_result):
+    [finding] = _findings_by_rule(june_result, "R2a")
+    assert finding["explanation"] == (
+        "Overseas dividend paid net of 15% withholding tax: 1500.00 gross, 1275.00 paid. "
+        "The tax of 225.00 is not in the cash book.")
 
 
 def _dividend(**changes) -> dict:

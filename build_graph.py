@@ -163,14 +163,15 @@ def finding_node_id(run_id: str, finding_id: str) -> str:
 
 def _add_findings(g: Graph, findings: list[dict], run: dict) -> None:
     for f in findings:
-        at = datetime.fromisoformat(f["created_at"])
+        at = datetime.fromisoformat(f["proposed_at"])
         node_id = finding_node_id(run["run_id"], f["finding_id"])
         g.add_node(at, node_id, node_type="Finding",
                    properties={"finding_id": f["finding_id"], "rule": f["rule"],
                                "category": f["category"], "type": f["type"],
                                "adjusts": f["adjusts"], "adjustment": Decimal(f["adjustment"]),
                                "status": f["status"], "proposed_by": f["proposed_by"],
-                               "run_id": run["run_id"], "evidence": json.dumps(f["evidence"])})
+                               "run_id": run["run_id"], "explanation": f["explanation"],
+                               "evidence": json.dumps(f["evidence"])})
         g.add_edge(at, node_id, run["statement_id"], layer="FINDING_FOR")
         for firm_id in f["firm_ids"]:
             g.add_edge(at, node_id, firm_id, layer="EXPLAINS_MOVEMENT")

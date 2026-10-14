@@ -1,7 +1,8 @@
 # Liquet — graph map (v1)
 #
-# How canonical records become a graph. The graph builder reads this file;
-# the agent reads it to understand what exists and what each link means.
+# How canonical records become a graph. build_graph.py follows this file (it
+# does not read it); the agent will read it to understand what exists and what
+# each link means.
 #
 # The graph is built from CANONICAL records (see docs/canonical-format.md and
 # docs/file-formats.md), never from the firm's document structure.
@@ -37,7 +38,8 @@ conventions:
   cardinality: >
     `from` = how many edges of this type each from-node has;
     `to` = how many each to-node has. Written as 1, 0..1, 0..*, 1..*.
-    The graph builder checks these after building and stops if any fails.
+    Planned: the graph builder will check these after building and stop if
+    any fails. Not built yet.
 
 nodes:
 
@@ -190,21 +192,33 @@ result_nodes:
       its own (a status, an approval, a journal) and can concern several
       records at once, for example five fee entries and one bank line.
     fields:
-      finding_id: Stable identifier, e.g. FND-2026-06-03.
-      statement_id: The bank statement (month) the finding belongs to.
+      finding_id: >
+        Stable identifier: who proposed it and the entry it is about, e.g.
+        R5:CE-2026-06-0011. The same input always gives the same id. In the
+        graph the node name adds the run id in front
+        (ACC-KRW-CASH-01_2026-06/run-001:R5:CE-2026-06-0011), so a re-run's
+        findings never merge with an earlier run's.
+      rule: The rule that proposed it (R2a, R5), or "agent".
       category: IN_TRANSITU, OMISSUM or ERRATUM.
       type: >
-        DEPOSIT_IN_TRANSIT, OUTSTANDING_PAYMENT, WITHHOLDING_TAX, BANK_FEE,
-        INTEREST or BOOK_ERROR. Open list; new types are added as cases appear.
-      amount: Size of the difference, always positive.
-      adjust_side: bank or book. Which side of the reconciliation it adjusts.
+        DEPOSIT_IN_TRANSIT, OUTSTANDING_PAYMENT, OUTSTANDING_RECEIPT,
+        WITHHOLDING_TAX, BANK_FEE, INTEREST or BOOK_ERROR. Open list; new types
+        are added as cases appear.
+      firm_ids: The firm movements it concerns (may be empty).
+      bank_ids: The bank lines it concerns (may be empty).
+      adjusts: bank or book. Which side of the reconciliation it adjusts.
       adjustment: Signed amount added to that side's closing balance.
-      explanation: Plain-language reason.
+      explanation: Plain-language reason, as it will appear in the month-end report.
+      evidence: Records and facts supporting it.
       status: PROPOSED, APPROVED or REJECTED. Only a person approves.
       proposed_by: The rule id, or "agent", that proposed it.
-      evidence: Records and facts supporting it.
-      proposed_at: When it was proposed.
-      decided_at: When a person approved or rejected it; null while proposed.
+      decided_by: The person who approved or rejected it; null while proposed.
+      proposed_at: When it was proposed (for rules, the run's run_at).
+      decided_at: >
+        When a person approved or rejected it; null while proposed.
+        Planned: written by the review log, not built yet.
+      # The month a finding belongs to is not a field: it is the FINDING_FOR
+      # edge to its BankStatement, and the run's run.json.
 
 edges:
 
@@ -336,8 +350,8 @@ edges:
       attributes:
         verdict: >
           CONGRUIT (same transaction), DISCREPAT (evidence they are not the
-          same) or NON_LIQUET (a candidate, but not enough evidence).
-        rule_id: The matching rule (or agent investigation) that produced the verdict.
+          same) or NON LIQUET (a candidate, but not enough evidence).
+        rule: The matching rule (or "agent") that produced the verdict.
         differences: >
           List of the ways the two records disagree. Each item has field
           (amount, date or reference), bank_value, firm_value and, for amounts,
@@ -345,13 +359,15 @@ edges:
           difference does not make the verdict DISCREPAT: the pair can be the
           same transaction and still disagree.
         evidence: Records and facts supporting the verdict.
-        decided_at: When the verdict was produced.
-      time: {node: edge, field: decided_at}
+        run_id: The run that produced it, e.g. ACC-KRW-CASH-01_2026-06/run-001.
+      # Rules decide when the run happens, so the edge's time is the run's
+      # run_at (from run.json), not a field of the decision itself.
+      time: {node: run, field: run_at}
       is_event: false
       cardinality: {from: "0..*", to: "0..*"}
       constraints:
         - Each CashMovement has at most one CONGRUIT edge.
-        - DISCREPAT and NON_LIQUET edges record candidates that were considered, so the reasoning is kept.
+        - DISCREPAT and NON LIQUET edges record candidates that were considered, so the reasoning is kept.
         - An item with no candidate at all gets no MATCHED_TO edge; it gets a Finding.
       meaning: >
         Liquet's conclusion about whether a bank line and a firm movement are

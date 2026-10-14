@@ -109,6 +109,7 @@ def test_findings_link_to_what_they_explain_and_to_their_month(g):
     assert tax.properties.get("type") == "WITHHOLDING_TAX"
     assert tax.properties.get("adjustment") == Decimal("-225.00")
     assert tax.properties.get("status") == "PROPOSED"
+    assert "withholding tax" in tax.properties.get("explanation")
     assert {n.name for n in tax.out_neighbours} == {
         "CE-2026-06-0004", _line(5), "ACC-KRW-CASH-01:2026-06"}
 
