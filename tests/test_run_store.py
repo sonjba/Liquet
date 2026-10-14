@@ -1,117 +1,153 @@
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
-from bank_prepare import bank_to_item
-from bank_reader import read_statement
-from firm_connector import FirmFileConnector
-from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
-from match import match
-from run_store import load_run, run_folder_name, save_run
+from run_month import ingest
+from run_store import (InputsChangedError, fingerprints, load_data, load_run, new_run_folder,
+                       next_run_folder, run_folder_name, save_data, save_received,
+                       save_results)
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)
-INPUTS = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",
-          "accounts": JUNE / "firm" / "accounts.json",
-          "portfolios": JUNE / "firm" / "portfolios.json"}
+SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",
+           "accounts": JUNE / "firm" / "accounts.json",
+           "portfolios": JUNE / "firm" / "portfolios.json"}
 
 
 @pytest.fixture(scope="module")
-def june_month():
-    """June's month dict, as run_month.main() builds it (only the parts save_run needs)."""
-    header, lines = read_statement(INPUTS["header"], INPUTS["lines"])
-    firm = FirmFileConnector(INPUTS["accounts"], INPUTS["portfolios"])
-    trades = {t["trade_id"]: t for t in firm.canonical["trades"]}
-    parties = parties_by_portfolio(firm.canonical)
-    domiciles = domiciles_by_ticker(firm.canonical)
-    entries = firm.get_cash_entries(header["account_id"], header["period_start"], header["period_end"])
-    result = match([bank_to_item(line) for line in lines],
-                   [firm_to_item(e, trades, parties, domiciles) for e in entries],
-                   period_end=header["period_end"])
-    return {"header": header, "result": result}
+def june_data():
+    """June in Liquet's format, as the door hands it over. Shared: don't change it."""
+    return ingest(SOURCES)
 
 
 @pytest.fixture
-def saved(june_month, tmp_path):
-    folder = save_run(june_month, tmp_path, run_at=RUN_AT, inputs=INPUTS)
-    return folder, load_run(folder)
+def header(june_data):
+    return june_data["bank_statement"]["header"]
 
 
-def test_folder_is_named_by_account_and_month_without_a_colon(june_month):
-    assert run_folder_name(june_month["header"]) == "ACC-KRW-CASH-01_2026-06"
+# ---------------- the run folder ----------------
+
+def test_folder_is_named_by_account_and_month_without_a_colon(header):
+    assert run_folder_name(header) == "ACC-KRW-CASH-01_2026-06"
 
 
-def test_the_four_files_are_written(saved):
-    folder, _ = saved
-    assert sorted(p.name for p in folder.iterdir()) == [
-        "decisions.json", "findings.json", "leftovers.json", "run.json"]
+def test_first_run_of_a_month_is_run_001_and_the_next_is_run_002(header, tmp_path):
+    first = new_run_folder(tmp_path, header)
+    second = new_run_folder(tmp_path, header)
+    assert first == tmp_path / "ACC-KRW-CASH-01_2026-06" / "run-001"
+    assert second.name == "run-002"
 
 
-def test_run_json_says_when_what_and_from_which_files(saved):
-    _, run = saved
+def test_next_run_number_follows_the_highest_not_the_count(tmp_path):
+    # run-001 was deleted by hand; run-002 remains: the next is run-003, not run-002.
+    (tmp_path / "run-002").mkdir()
+    (tmp_path / "notes").mkdir()
+    assert next_run_folder(tmp_path).name == "run-003"
+
+
+# ---------------- received ----------------
+
+def test_received_files_are_exact_copies_named_by_role(tmp_path):
+    received = save_received(tmp_path, SOURCES, fingerprints(SOURCES))
+    assert sorted(p.name for p in (tmp_path / "received").iterdir()) == [
+        "accounts.json", "header.json", "lines.csv", "portfolios.json"]
+    assert (tmp_path / "received" / "lines.csv").read_bytes() == SOURCES["lines"].read_bytes()
+    assert received["lines"]["file"] == "received/lines.csv"
+    assert received["lines"]["original_path"] == str(SOURCES["lines"])
+    assert len(received["lines"]["sha256"]) == 64
+
+
+def test_a_file_that_changed_after_it_was_read_stops_the_run(tmp_path):
+    lines = tmp_path / "bank_statement.csv"
+    lines.write_bytes(SOURCES["lines"].read_bytes())
+    sources = dict(SOURCES, lines=lines)
+    read = fingerprints(sources)
+    lines.write_bytes(lines.read_bytes() + b"\n")          # changed between read and copy
+    (tmp_path / "run").mkdir()
+    with pytest.raises(InputsChangedError, match="lines"):
+        save_received(tmp_path / "run", sources, read)
+
+
+# ---------------- data ----------------
+
+def test_data_is_three_liquet_files(june_data, tmp_path):
+    save_data(tmp_path, june_data)
+    assert sorted(p.name for p in (tmp_path / "data").iterdir()) == [
+        "bank_statement.json", "firm_canonical.json", "firm_cash_entries.json"]
+
+
+def test_data_loads_back_exactly_as_it_was_saved(june_data, tmp_path):
+    save_data(tmp_path, june_data)
+    assert load_data(tmp_path) == june_data
+
+
+def test_money_and_dates_come_back_as_decimal_and_date(june_data, tmp_path):
+    save_data(tmp_path, june_data)
+    statement = load_data(tmp_path)["bank_statement"]
+    assert statement["header"]["closing_balance"] == Decimal("285378.57")
+    assert statement["header"]["period_end"] == date(2026, 6, 30)
+    line = statement["lines"][1]
+    assert (line["date"], line["amount"], line["paid_in"]) == (
+        date(2026, 6, 3), Decimal("-4852.40"), None)
+
+
+def test_money_is_saved_as_text(june_data, tmp_path):
+    save_data(tmp_path, june_data)
+    saved = json.loads((tmp_path / "data" / "bank_statement.json").read_text())
+    assert saved["lines"][1]["amount"] == "-4852.40"
+
+
+def test_a_run_without_data_says_so(tmp_path):
+    with pytest.raises(FileNotFoundError, match="no data/ folder"):
+        load_data(tmp_path)
+
+
+# ---------------- results ----------------
+
+def _result():
+    return {"decisions": [{"bank_id": "B", "firm_id": "F",
+                           "differences": [{"difference": Decimal("-225.00")}]}],
+            "findings": [{"finding_id": "R5:F", "status": "PROPOSED"}],
+            "unmatched_bank": [], "unmatched_firm": [{"id": "F2"}]}
+
+
+def test_results_and_run_json_are_written(header, tmp_path):
+    folder = new_run_folder(tmp_path, header)
+    save_results(folder, header, _result(), RUN_AT, received={"lines": {}}, stages=["a", "b"])
+    run = load_run(folder)
     info = run["run"]
+    assert info["run_id"] == "ACC-KRW-CASH-01_2026-06/run-001"
     assert info["statement_id"] == "ACC-KRW-CASH-01:2026-06"
     assert info["period_end"] == "2026-06-30"
     assert info["run_at"] == "2026-07-02T09:30:00+00:00"
-    assert set(info["inputs"]) == {"header", "lines", "accounts", "portfolios"}
-    assert all(len(f["sha256"]) == 64 for f in info["inputs"].values())
-    assert info["counts"] == {"decisions": 15, "findings": 2,
-                              "leftover_bank": 2, "leftover_firm": 1}
+    assert info["stages"] == ["a", "b"]
+    assert info["counts"] == {"decisions": 1, "findings": 1, "leftover_bank": 0,
+                              "leftover_firm": 1}
+    assert run["decisions"][0]["differences"][0]["difference"] == "-225.00"
+    assert run["findings"][0]["created_at"] == "2026-07-02T09:30:00+00:00"
 
 
-def test_money_is_saved_as_exact_text(saved):
-    _, run = saved
-    dividend = next(d for d in run["decisions"] if d["rule"] == "R2")
-    assert dividend["differences"][0]["difference"] == "-225.00"
+def test_saving_does_not_change_the_result_in_memory(header, tmp_path):
+    result = _result()
+    save_results(tmp_path, header, result, RUN_AT, received={}, stages=[])
+    assert "created_at" not in result["findings"][0]
 
 
-def test_findings_are_stamped_with_created_at(saved):
-    _, run = saved
-    assert [f["finding_id"] for f in run["findings"]] == ["R2a:CE-2026-06-0004",
-                                                         "R5:CE-2026-06-0011"]
-    assert all(f["created_at"] == "2026-07-02T09:30:00+00:00" for f in run["findings"])
-    assert all(f["status"] == "PROPOSED" for f in run["findings"])
+def test_a_run_without_run_json_did_not_finish(tmp_path):
+    with pytest.raises(FileNotFoundError, match="did not finish"):
+        load_run(tmp_path)
 
 
-def test_leftovers_are_what_the_agent_gets(saved):
-    _, run = saved
-    assert [i["id"].split(":")[-1] for i in run["leftovers"]["bank"]] == ["L12", "L13"]
-    assert [i["id"] for i in run["leftovers"]["firm"]] == ["CE-2026-06-0008"]
-
-
-def test_saving_does_not_change_the_result_in_memory(june_month, tmp_path):
-    save_run(june_month, tmp_path, run_at=RUN_AT, inputs=INPUTS)
-    assert "created_at" not in june_month["result"]["findings"][0]
-
-
-def test_a_saved_run_is_never_overwritten(june_month, tmp_path):
-    save_run(june_month, tmp_path, run_at=RUN_AT, inputs=INPUTS)
+def test_results_are_never_overwritten(header, tmp_path):
+    save_results(tmp_path, header, _result(), RUN_AT, received={}, stages=[])
     with pytest.raises(FileExistsError, match="never overwritten"):
-        save_run(june_month, tmp_path, run_at=RUN_AT, inputs=INPUTS)
+        save_results(tmp_path, header, _result(), RUN_AT, received={}, stages=[])
 
 
-def test_same_input_and_time_give_the_same_files(june_month, tmp_path):
-    first = save_run(june_month, tmp_path / "a", run_at=RUN_AT, inputs=INPUTS)
-    second = save_run(june_month, tmp_path / "b", run_at=RUN_AT, inputs=INPUTS)
-    for name in ("run.json", "decisions.json", "findings.json", "leftovers.json"):
-        assert (first / name).read_text() == (second / name).read_text()
-
-
-def test_a_changed_input_file_changes_its_fingerprint(june_month, tmp_path):
-    copy = tmp_path / "bank_statement.csv"
-    copy.write_bytes(INPUTS["lines"].read_bytes() + b"\n")
-    folder = save_run(june_month, tmp_path / "runs", run_at=RUN_AT,
-                      inputs=dict(INPUTS, lines=copy))
-    saved_hash = json.loads((folder / "run.json").read_text())["inputs"]["lines"]["sha256"]
-    original = save_run(june_month, tmp_path / "runs2", run_at=RUN_AT, inputs=INPUTS)
-    original_hash = json.loads((original / "run.json").read_text())["inputs"]["lines"]["sha256"]
-    assert saved_hash != original_hash
-
-
-def test_something_json_cannot_hold_is_refused(june_month, tmp_path):
-    bad = {"header": june_month["header"],
-           "result": dict(june_month["result"], decisions=[{"oops": {1, 2}}])}
+def test_something_json_cannot_hold_is_refused(header, tmp_path):
+    bad = dict(_result(), decisions=[{"oops": {1, 2}}])
     with pytest.raises(TypeError, match="can't save set"):
-        save_run(bad, tmp_path, run_at=RUN_AT, inputs=INPUTS)
+        save_results(tmp_path, header, bad, RUN_AT, received={}, stages=[])
