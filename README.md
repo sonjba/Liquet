@@ -4,6 +4,8 @@
 
 *Liquet - Latin for "it is clear."*
 
+Built in Python, with a temporal graph in [Raphtory](https://github.com/Pometry/Raphtory).
+
 ---
 
 ## Project Description
@@ -51,13 +53,15 @@ Liquet works backwards from the unexplained difference and gathers the evidence 
 
 ## How It Works
 
-### 1. Load
+### 1. Import, once
 
-Load the month's bank statement and the business's own cash records.
+The bank statement and the firm's records arrive in their own formats. Liquet turns them into its own format **once**, at the door, checks them, and stores both: the files exactly as they arrived, and the same data in Liquet's format. From that point on, nothing in Liquet reads anything else.
+
+A new bank or a new firm system means a new reader and mapping at the door, and no change anywhere else. A test fails if any later part of the code reaches back into the door.
 
 ### 2. Match
 
-Deterministic rules identify transactions that agree on defined criteria.
+Deterministic rules identify transactions that agree on defined criteria, strictest first: same reference and amount, same reference with a difference, one bank line for several entries, matching without a reference, and settlements still in transit at month end.
 
 ### 3. Connect
 
@@ -88,6 +92,83 @@ Every step is logged so that the reconciliation can be reviewed later.
 ### 7. Learn Across Months
 
 The following month, Liquet checks whether expected timing differences have actually cleared.
+
+---
+
+## The Pipeline
+
+Each run of a month goes through the same stages, in the same order, and each stage uses only what the stages before it produced:
+
+```
+bank files ─► bank reader + mapping ─┐
+                                     ├─► store ─► prepare ─► match ─► check ─► save ─► graph
+firm files ─► firm connector + mapping ┘
+            (the door: the only code that knows outside formats)
+```
+
+Every run gets its own folder, and nothing in it is ever changed or overwritten. Running a month again makes a new folder next to the first:
+
+```
+runs/ACC-KRW-CASH-01_2026-06/run-001/
+  received/   the files exactly as they arrived, with fingerprints
+  data/       the same data in Liquet's format: what matching and the graph use
+  decisions.json, findings.json, leftovers.json
+  run.json    when it ran, from which files, which stages ran
+  graph/      checked snapshots of the graph
+```
+
+Matching runs on the data read back from `data/`, so what is stored is exactly what was used. The graph is rebuilt from the run folder alone, so a June run still shows what Liquet saw in June, even if a mapping changes next year.
+
+More detail: [`docs/pipeline.md`](docs/pipeline.md).
+
+---
+
+## Two Phases
+
+Liquet runs in two phases that work differently.
+
+**Phase 1 — Matching (a fixed pipeline).** Import, store, prepare, match, check, save.
+The order never changes, nothing loops back, and the same input always gives the same result.
+This is the part described above.
+
+**Phase 2 — Investigation (a loop).** What the rules could not settle goes to the agent.
+It calls a tool, reads the result, and decides what to look at next. It proposes an explanation;
+a person approves it or sends it back, and the agent looks again. The steps can't be drawn in
+advance, because each one depends on what the last one found.
+
+Two rules keep the loop safe:
+
+- **It is bounded.** There is a limit on tool calls per investigation and on review rounds.
+  If the limit is reached without enough evidence, the answer is `NON LIQUET` and a person decides.
+- **The record never loops.** Every proposal, approval and rejection is a new event added to the
+  run's review log, never an edit. The process can go round; the history only moves forward.
+
+The temporal graph is used by both phases. It is the evidence they work from, not the order they run in.
+
+---
+
+## Why a Temporal Graph (Raphtory)
+
+A reconciliation is a story in time. Money moves on one day, the bank shows it on another, Liquet decides on a third, and a person approves later still. A plain table keeps the latest state. I wanted the graph to keep **when** each thing became true.
+
+So every record and decision in Liquet's graph is added at its own time:
+
+- a cash entry at the date the money moved;
+- a bank line at the date the bank shows;
+- a trade's settlement at its settlement date;
+- a decision or finding at the moment Liquet made it.
+
+That lets the graph answer questions a table can't answer directly:
+
+- "What did we know at the end of June?" → `g.before("2026-07-01")`
+- "Which entries fall in the first half of the month?" → `g.window("2026-06-01", "2026-06-16")`
+- "Whose money is this?" → entry → portfolio → client, in one walk
+
+For June, the graph has 52 nodes and 92 edges: clients, portfolios, the account, securities, trades, cash entries, the bank statement and its lines, and the findings, joined by ownership, settlement, match and explanation edges.
+
+**Something I found along the way.** In my tests on Raphtory 0.17.0, saving a graph with `save_to_file` dropped `Decimal` properties without any error, which for money is the worst kind of failure. Parquet (`to_parquet` / `from_parquet`) kept them. So Liquet saves snapshots as Parquet, loads each one straight back, and compares it with the original before it counts as saved. A snapshot that loses anything stops the save.
+
+To see the graph, run `show_graph.py` on a run folder (it uses pyvis). It writes a `graph.html` you can open in a browser.
 
 ---
 
@@ -168,7 +249,7 @@ The system does not require the agent to always have an answer.
 
 ---
 
-## Design Principle ()
+## Design Principle
 
 Liquet does not replace the person responsible for the reconciliation.
 
@@ -182,15 +263,42 @@ It separates three things:
 
 > **The system proposes. The evidence explains. The person approves.**
 
+---
 
 ## Status
 
-Early development. Built so far:
-- Statement reader (CSV + header): type conversion, input validation,
-  and self-checks (totals, running balance, dates).
-- Tests for the reader.
+Built so far:
 
-Planned: cash-book loading, matching rules, the graph layer, the agent, and evaluation.
+- **The door.** Bank statement reader (CSV + header) with type conversion, input validation and self-checks (totals, running balance, dates). Firm connector with path-based mapping into canonical collections, and canonical checks. A continuity check between statements (same account, no gap or overlap, opening equals previous closing).
+- **Store.** One folder per run, never overwritten: received files with fingerprints, Liquet-format data, results.
+- **Matching rules R1–R5** (plus R2a for overseas withholding tax), and checks after matching: nothing matched twice, nothing lost.
+- **Temporal graph** in Raphtory, rebuilt from the run folder, with checked Parquet snapshots and an interactive view.
+- **Tests** for each part, including tests that fail if code after the door imports the door.
+
+For the June fixture, the rules make 15 decisions and 2 findings, and leave 2 bank lines and 1 firm entry for the agent.
+
+Next: the review log (approvals, rejections and agent proposals as events), the agent and its tools, the month-end report, and evaluation against the answer key.
+
+---
+
+## Running It
+
+Needs Python 3.11 or newer (Raphtory requires it).
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+
+pytest -q
+
+python run_month.py --header tests/fixtures/2026-06/statement_header.json --lines tests/fixtures/2026-06/bank_statement.csv --accounts tests/fixtures/2026-06/firm/accounts.json --portfolios tests/fixtures/2026-06/firm/portfolios.json
+
+python build_graph.py runs/ACC-KRW-CASH-01_2026-06/run-001 --snapshot
+python show_graph.py runs/ACC-KRW-CASH-01_2026-06/run-001
+```
+
+---
 
 ## Data
 
@@ -198,10 +306,17 @@ All data in this repository is synthetic. No real company, client or bank data i
 
 - The firm (Kestrel Row Wealth Ltd), its custodian (Northgate Custody Bank),
   clients and securities are invented. Any resemblance to real firms or people
-  is coincidental. See `docs/firm-profile.md`.
+  is coincidental. See `tests/firm-profile.md`.
 - The firm profile, the June statement (`tests/fixtures/2026-06/`) and the
   test cases (`tests/fixtures/cases/`) were generated with help from an AI
   assistant (Claude) and checked by me.
+
+## Credits
+
+- [Raphtory](https://github.com/Pometry/Raphtory) by Pometry, for the temporal graph.
+- The continuity check between statements follows the idea of `verify_continuity`
+  in [bankstatementparser](https://github.com/sebastienrousseau/bankstatementparser)
+  by Sebastien Rousseau. Liquet compares balances to the penny, with no tolerance.
 
 ## AI assistance
 
@@ -228,9 +343,13 @@ arriving net of withholding tax), it proposes a new deterministic matching rule.
 it, and from then on the rules engine handles it without AI. The aim is for the AI's role to shrink
 as its findings become tested rules.
 
+**Faster graph updates**
+Today each run's graph is rebuilt from its folder. Later: load the latest snapshot and add only
+the new events, with tests that the result equals a full rebuild.
+
 **More input formats**
-PDF, Excel, MT940 and camt.053 statements, each through its own reader producing the same
-statement lines. PDF reading would use an LLM, with the existing self-checks (totals, running
+PDF, Excel, MT940 and camt.053 statements, each through its own reader at the door, producing the
+same Liquet statement. PDF reading would use an LLM, with the existing self-checks (totals, running
 balance, dates) verifying what it read.
 
 **More data sources**
@@ -242,5 +361,5 @@ Plain-language questions ("Which May items are still in transit?") answered by c
 same tested tools.
 
 **Broader reconciliation**
-Several accounts and currencies, continuity checks between months, and reconciliation of
-holdings as well as cash.
+Several accounts and currencies, continuity checks across every month in a run, and
+reconciliation of holdings as well as cash.
