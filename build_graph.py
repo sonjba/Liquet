@@ -44,6 +44,7 @@ Snapshots
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -262,9 +263,8 @@ if __name__ == "__main__":
 
     graph = build_graph(args.run_folder)
     print(f"{graph.count_nodes()} nodes, {graph.count_edges()} edges")
-    for node_type in ("Client", "Portfolio", "Account", "AccountBalance", "Security", "Trade",
-                      "CashMovement", "BankStatement", "BankEntry", "Finding"):
-        count = sum(1 for n in graph.nodes if n.node_type == node_type)
+    # every type the graph has, so new ones (Decision, Actor) show without editing a list
+    for node_type, count in Counter(n.node_type for n in graph.nodes).items():
         print(f"  {node_type:<15} {count}")
     if args.snapshot:
         stage = "review" if load_reviews(args.run_folder) else "rules"
