@@ -259,3 +259,24 @@ def test_a_review_snapshot_is_saved_next_to_the_rules_one(g, reviewed, tmp_path)
     review = save_snapshot(reviewed, tmp_path, "review", REVIEW_AT)
     assert load_snapshot(rules).count_nodes() == 54         # the rules version, unchanged
     assert describe(load_snapshot(review)) == describe(reviewed)
+
+
+def test_a_proposal_is_a_finding_with_its_proposer(june_run, tmp_path):
+    from decide import record
+    from propose import record_proposal
+    folder = tmp_path / "run-001"
+    shutil.copytree(june_run, folder)
+    l12 = "ACC-KRW-CASH-01:2026-06:L12"
+    record_proposal(folder, [l12], "OMISSUM", "BANK_FEE", "book", "-45.00",
+                    "June custody fee, not yet booked.", "quaestor", "agent", REVIEW_AT,
+                    model="claude-sonnet-5-5")
+    record(folder, "APPROVED", "P1", "sonja", REVIEW_AT + timedelta(hours=1), "CONFIRMED")
+    g = build_graph(folder)
+    from run_store import load_run
+    node = finding_node_id(load_run(folder)["run"]["run_id"], "P1")
+    assert g.node(node).node_type == "Finding"
+    assert g.node(node).properties.get("model") == "claude-sonnet-5-5"
+    assert [e.dst.name for e in g.valid_layers(["PROPOSED_BY"]).node(node).out_edges] == ["agent:quaestor"]
+    assert [e.dst.name for e in g.valid_layers(["EXPLAINS_LINE"]).node(node).out_edges] == [l12]
+    assert g.before(REVIEW_AT + timedelta(minutes=30)).node(node).properties.get("status") == "PROPOSED"
+    assert g.node(node).properties.get("status") == "APPROVED"

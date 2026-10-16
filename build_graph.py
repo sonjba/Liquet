@@ -53,6 +53,7 @@ from raphtory import Graph
 
 from firm_prepare import firm_items
 from decide import load_reviews
+from propose import load_proposals
 from run_store import _to_text, load_liquet_format, load_run
 
 
@@ -77,6 +78,7 @@ def build_graph(run_folder: Path) -> Graph:
     _add_bank(g, data)
     _add_decisions(g, saved["decisions"], run_at, run["run_id"])
     _add_findings(g, saved["findings"], run)
+    _add_proposals(g, load_proposals(run_folder), run)
     _add_reviews(g, load_reviews(run_folder), run)
     return g
 
@@ -194,6 +196,27 @@ def _add_findings(g: Graph, findings: list[dict], run: dict) -> None:
             g.add_edge(at, node_id, bank_id, layer="EXPLAINS_LINE")
 
 
+def _add_proposals(g: Graph, proposals: list[dict], run: dict) -> None:
+    """A proposal is a Finding like a rule's, proposed by the agent or a person."""
+    for p in proposals:
+        at = datetime.fromisoformat(p["at"])
+        node_id = finding_node_id(run["run_id"], p["proposal_id"])
+        g.add_node(at, node_id, node_type="Finding",
+                   properties={"finding_id": p["proposal_id"], "category": p["category"],
+                               "type": p["type"], "adjusts": p["adjusts"],
+                               "adjustment": Decimal(p["adjustment"]), "status": "PROPOSED",
+                               "proposed_by": p["proposed_by"], "proposer": p["proposer"],
+                               "model": p["model"] or "", "run_id": run["run_id"],
+                               "explanation": p["explanation"],
+                               "evidence": json.dumps(p["evidence"])})
+        g.add_edge(at, node_id, run["statement_id"], layer="FINDING_FOR")
+        g.add_edge(at, node_id, _add_actor(g, at, p["proposer"], p["proposed_by"]),
+                   layer="PROPOSED_BY")
+        for item_id in p["item_ids"]:
+            layer = "EXPLAINS_LINE" if g.node(item_id).node_type == "BankEntry" else "EXPLAINS_MOVEMENT"
+            g.add_edge(at, node_id, item_id, layer=layer)
+
+
 def _add_reviews(g: Graph, reviews: list[dict], run: dict) -> None:
     """Each decision in reviews.jsonl, at the moment it was made:
       Decision node  (what was decided and why: kind, reason_code, reason)
@@ -267,6 +290,11 @@ if __name__ == "__main__":
     for node_type, count in Counter(n.node_type for n in graph.nodes).items():
         print(f"  {node_type:<15} {count}")
     if args.snapshot:
-        stage = "review" if load_reviews(args.run_folder) else "rules"
+        if load_reviews(args.run_folder):
+            stage = "review"
+        elif load_proposals(args.run_folder):
+            stage = "proposed"
+        else:
+            stage = "rules"
         folder = save_snapshot(graph, args.run_folder, stage, datetime.now(timezone.utc))
         print(f"Snapshot saved to {folder}")

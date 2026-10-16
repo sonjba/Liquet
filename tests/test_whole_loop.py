@@ -24,6 +24,7 @@ def test_run_review_and_write_before_and_after(tmp_path, capsys):
     reviews = (loop["run"] / "reviews.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(line)["kind"] for line in reviews] == ["APPROVED", "REJECTED"]
 
+    # USED WHEN WE WANT TO SEE GRAPH AS JSON
     # before, after = (json.loads(f.read_text(encoding="utf-8")) for f in loop["files"])
     # assert "Decision" not in before["nodes"]                     # no decision yet
     # assert [d["properties"]["kind"] for d in after["nodes"]["Decision"]] == [

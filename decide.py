@@ -1,4 +1,4 @@
-"""A person's decisions on a run's findings: approve or reject.
+"""A person's decisions on a run's findings and proposals: approve or reject.
 
     python decide.py RUN approve R5:CE-2026-06-0011 --by sonja --code CONFIRMED
     python decide.py RUN reject R2a:CE-2026-06-0004 --by sonja --code NEEDS_EVIDENCE \
@@ -37,12 +37,14 @@ def load_reviews(run_folder: Path) -> list[dict]:
 def record(run_folder: Path, kind: str, finding_id: str, by: str, at: datetime,
            reason_code: str, reason: str = "") -> dict:
     """Check one decision, then add it to the end of reviews.jsonl."""
+    from propose import load_proposals  # imported here: propose.py imports this module
     findings = {f["finding_id"] for f in load_run(run_folder)["findings"]}
+    findings |= {p["proposal_id"] for p in load_proposals(run_folder)}
     decided = {r["finding_id"] for r in load_reviews(run_folder)}
     if kind not in ("APPROVED", "REJECTED"):
         raise ValueError(f"a decision is APPROVED or REJECTED, not {kind!r}")
     if finding_id not in findings:
-        raise ValueError(f"this run has no finding {finding_id!r}")
+        raise ValueError(f"this run has no finding or proposal {finding_id!r}")
     if finding_id in decided:
         raise ValueError(f"{finding_id} is already decided")
     if reason_code not in REASON_CODES:
@@ -58,7 +60,7 @@ def record(run_folder: Path, kind: str, finding_id: str, by: str, at: datetime,
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Approve or reject a finding.")
+    parser = argparse.ArgumentParser(description="Approve or reject a finding or a proposal.")
     parser.add_argument("run_folder", type=Path)
     parser.add_argument("action", choices=["approve", "reject"])
     parser.add_argument("finding_id")
