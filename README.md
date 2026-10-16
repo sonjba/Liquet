@@ -111,13 +111,13 @@ Every run gets its own folder, and nothing in it is ever changed or overwritten.
 ```
 runs/ACC-KRW-CASH-01_2026-06/run-001/
   received/   the files exactly as they arrived, with fingerprints
-  data/       the same data in Liquet's format: what matching and the graph use
+  liquet_format/  the same data in Liquet's format: what matching and the graph use
   decisions.json, findings.json, leftovers.json
   run.json    when it ran, from which files, which stages ran
   graph/      checked snapshots of the graph
 ```
 
-Matching runs on the data read back from `data/`, so what is stored is exactly what was used. The graph is rebuilt from the run folder alone, so a June run still shows what Liquet saw in June, even if a mapping changes next year.
+Matching runs on the data read back from `liquet_format/`, so what is stored is exactly what was used. The graph is rebuilt from the run folder alone, so a June run still shows what Liquet saw in June, even if a mapping changes next year.
 
 More detail: [`docs/pipeline.md`](docs/pipeline.md).
 

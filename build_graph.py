@@ -4,7 +4,7 @@ The run folder is the source of truth; the graph is rebuilt from it, and
 from nothing else:
 
   1. Read the run's results (run_store.load_run) and its Liquet-format data
-     (run_store.load_data: the data/ folder written before matching).
+     (run_store.load_liquet_format: the liquet_format/ folder written before matching).
   2. Add every record at its own time (when the money moved), every decision
      and finding at the run's time (when Liquet decided).
 
@@ -51,7 +51,8 @@ from pathlib import Path
 from raphtory import Graph
 
 from firm_prepare import firm_items
-from run_store import _to_text, load_data, load_run
+from decide import load_reviews
+from run_store import _to_text, load_liquet_format, load_run
 
 
 # ---------------- building ----------------
@@ -60,7 +61,7 @@ def build_graph(run_folder: Path) -> Graph:
     """Build the graph for one saved run."""
     saved = load_run(run_folder)
     run = saved["run"]
-    stored = load_data(run_folder)
+    stored = load_liquet_format(run_folder)
     header = stored["bank_statement"]["header"]
     data = {"header": header,
             "lines": stored["bank_statement"]["lines"],
@@ -75,6 +76,7 @@ def build_graph(run_folder: Path) -> Graph:
     _add_bank(g, data)
     _add_decisions(g, saved["decisions"], run_at, run["run_id"])
     _add_findings(g, saved["findings"], run)
+    _add_reviews(g, load_reviews(run_folder), run)
     return g
 
 
@@ -184,10 +186,39 @@ def _add_findings(g: Graph, findings: list[dict], run: dict) -> None:
                                "run_id": run["run_id"], "explanation": f["explanation"],
                                "evidence": json.dumps(f["evidence"])})
         g.add_edge(at, node_id, run["statement_id"], layer="FINDING_FOR")
+        g.add_edge(at, node_id, _add_actor(g, at, "rule", f["proposed_by"]), layer="PROPOSED_BY")
         for firm_id in f["firm_ids"]:
             g.add_edge(at, node_id, firm_id, layer="EXPLAINS_MOVEMENT")
         for bank_id in f["bank_ids"]:
             g.add_edge(at, node_id, bank_id, layer="EXPLAINS_LINE")
+
+
+def _add_reviews(g: Graph, reviews: list[dict], run: dict) -> None:
+    """Each decision in reviews.jsonl, at the moment it was made:
+      Decision node  (what was decided and why: kind, reason_code, reason)
+        --DECIDES-->  the Finding it is about
+        --MADE_BY-->  the person (an Actor)
+    and the Finding's status changes: PROPOSED before that moment,
+    APPROVED or REJECTED after. Nothing earlier in the graph changes."""
+    for number, r in enumerate(reviews, start=1):
+        at = datetime.fromisoformat(r["at"])
+        decision = f"{run['run_id']}:D{number}"
+        finding = finding_node_id(run["run_id"], r["finding_id"])
+        person = _add_actor(g, at, "person", r["by"])
+        g.add_node(at, decision, node_type="Decision",
+                   properties={"kind": r["kind"], "reason_code": r.get("reason_code", ""),
+                               "reason": r["reason"], "run_id": run["run_id"]})
+        g.add_edge(at, decision, finding, layer="DECIDES")
+        g.add_edge(at, decision, person, layer="MADE_BY")
+        g.add_node(at, finding, properties={"status": r["kind"], "decided_by": r["by"]})
+
+
+def _add_actor(g: Graph, at: datetime, kind: str, name: str) -> str:
+    """Whoever proposes or decides: a person, a rule, or (later) the agent.
+    One node each, e.g. person:sonja, rule:R5. Returns its id."""
+    actor = f"{kind}:{name}"
+    g.add_node(at, actor, node_type="Actor", properties={"kind": kind, "name": name})
+    return actor
 
 
 # ---------------- snapshots ----------------
@@ -236,5 +267,6 @@ if __name__ == "__main__":
         count = sum(1 for n in graph.nodes if n.node_type == node_type)
         print(f"  {node_type:<15} {count}")
     if args.snapshot:
-        folder = save_snapshot(graph, args.run_folder, "rules", datetime.now(timezone.utc))
+        stage = "review" if load_reviews(args.run_folder) else "rules"
+        folder = save_snapshot(graph, args.run_folder, stage, datetime.now(timezone.utc))
         print(f"Snapshot saved to {folder}")

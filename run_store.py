@@ -8,7 +8,7 @@ without touching the earlier run:
     runs/ACC-KRW-CASH-01_2026-06/run-001/
         received/                 the files exactly as they arrived (copies)
             header.json, lines.csv, accounts.json, portfolios.json
-        data/                     the same data in Liquet's format: from here
+        liquet_format/            the same data in Liquet's format: from here
             bank_statement.json   on, nothing reads anything else
             firm_canonical.json
             firm_cash_entries.json
@@ -19,7 +19,7 @@ without touching the earlier run:
                                   the received files and their fingerprints,
                                   the stages that ran, the counts
 
-A run folder without run.json did not finish: received/ and data/ show how
+A run folder without run.json did not finish: received/ and liquet_format/ show how
 far it got.
 
 Money is saved as text ("-225.00") and dates as "2026-06-30", the same rule as
@@ -37,8 +37,12 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+# The two folders of a run: what arrived, and the same data after the door.
+RECEIVED = "received"
+LIQUET_FORMAT = "liquet_format"
+
 # Which fields of a Liquet bank statement are dates and money. Saved as text,
-# turned back into date and Decimal by load_data().
+# turned back into date and Decimal by load_liquet_format().
 HEADER_DATES = ("period_start", "period_end")
 HEADER_MONEY = ("opening_balance", "closing_balance")
 LINE_DATES = ("date",)
@@ -89,7 +93,7 @@ def save_received(folder: Path, sources: dict[str, Path],
     """Copy each source file into folder/received/ as <name><suffix>, and check
     each copy is the file that was read (same fingerprint). Returns what
     run.json records about them."""
-    received_dir = Path(folder) / "received"
+    received_dir = Path(folder) / RECEIVED
     received_dir.mkdir()
     received = {}
     for name, path in sources.items():
@@ -105,23 +109,24 @@ def save_received(folder: Path, sources: dict[str, Path],
 
 # ---------------- data: the same data in Liquet's format ----------------
 
-def save_data(folder: Path, data: dict) -> None:
-    """Write the Liquet-format data into folder/data/:
+def save_liquet_format(folder: Path, data: dict) -> None:
+    """Write the Liquet-format data into folder/liquet_format/:
     data = {"bank_statement": {"header", "lines"}, "firm_canonical": {...},
             "firm_cash_entries": [...]}"""
-    data_dir = Path(folder) / "data"
+    data_dir = Path(folder) / LIQUET_FORMAT
     data_dir.mkdir()
     for name in ("bank_statement", "firm_canonical", "firm_cash_entries"):
         _write(data_dir / f"{name}.json", data[name])
 
 
-def load_data(folder: Path) -> dict:
-    """Read folder/data/ back, with dates and money as date and Decimal again:
-    the same dict save_data() was given."""
-    data_dir = Path(folder) / "data"
+def load_liquet_format(folder: Path) -> dict:
+    """Read folder/liquet_format/ back, with dates and money as date and Decimal again:
+    the same dict save_liquet_format() was given."""
+    data_dir = Path(folder) / LIQUET_FORMAT
     if not data_dir.is_dir():
-        raise FileNotFoundError(f"{folder} has no data/ folder: it was saved before Liquet "
-                                f"stored its data. Run the month again to make a new run.")
+        raise FileNotFoundError(f"{folder} has no liquet_format/ folder: it was saved before "
+                                f"Liquet stored its data that way. Run the month again to make "
+                                f"a new run.")
     data = {name: json.loads((data_dir / f"{name}.json").read_text(encoding="utf-8"))
             for name in ("bank_statement", "firm_canonical", "firm_cash_entries")}
     statement = data["bank_statement"]

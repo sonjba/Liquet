@@ -1,6 +1,6 @@
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -58,7 +58,7 @@ def _line(n: int) -> str:
 @pytest.mark.parametrize("node_type, expected", [
     ("Client", 5), ("Portfolio", 5), ("Account", 1), ("AccountBalance", 1),
     ("Security", 4), ("Trade", 5), ("CashMovement", 16), ("BankStatement", 1),
-    ("BankEntry", 12), ("Finding", 2),
+    ("BankEntry", 12), ("Finding", 2), ("Actor", 2),
 ])
 def test_june_has_every_record_as_a_node(g, node_type, expected):
     assert _count(g, node_type) == expected
@@ -122,7 +122,7 @@ def test_findings_link_to_what_they_explain_and_to_their_month(g):
     assert tax.properties.get("status") == "PROPOSED"
     assert "withholding tax" in tax.properties.get("explanation")
     assert {n.name for n in tax.out_neighbours} == {
-        "CE-2026-06-0004", _line(5), "ACC-KRW-CASH-01:2026-06"}
+        "CE-2026-06-0004", _line(5), "ACC-KRW-CASH-01:2026-06", "rule:R2a"}
 
 
 def test_finding_names_carry_the_run(g):
@@ -167,14 +167,14 @@ def test_the_run_folder_alone_is_enough(tmp_path):
     run_folder = _save_june_run(sources, tmp_path / "runs")
     for path in sources.values():
         path.unlink()
-    assert build_graph(run_folder).count_nodes() == 52
+    assert build_graph(run_folder).count_nodes() == 54
 
 
 def test_a_run_saved_before_data_was_stored_says_so(june_run, tmp_path):
     old = tmp_path / "old-run"
     shutil.copytree(june_run, old)
-    shutil.rmtree(old / "data")
-    with pytest.raises(FileNotFoundError, match="no data/ folder"):
+    shutil.rmtree(old / "liquet_format")
+    with pytest.raises(FileNotFoundError, match="no liquet_format/ folder"):
         build_graph(old)
 
 
@@ -207,3 +207,55 @@ def test_a_snapshot_is_never_overwritten(g, tmp_path):
 
 def test_rebuilding_gives_the_same_graph(june_run, g):
     assert describe(build_graph(june_run)) == describe(g)
+
+# ---------------- who proposed, and a person's decisions ----------------
+
+def test_each_finding_points_to_the_rule_that_proposed_it(g):
+    proposer = g.edge(finding_node_id(RUN_ID, "R5:CE-2026-06-0011"), "rule:R5")
+    assert proposer.layer_names == ["PROPOSED_BY"]
+    assert g.node("rule:R5").properties.get("kind") == "rule"
+
+
+@pytest.fixture(scope="module")
+def reviewed(june_run, tmp_path_factory):
+    """A copy of the June run where sonja approved R5 and rejected R2a, an hour apart."""
+    from decide import record
+    folder = tmp_path_factory.mktemp("reviewed") / "run-001"
+    shutil.copytree(june_run, folder)
+    record(folder, "APPROVED", "R5:CE-2026-06-0011", "sonja", REVIEW_AT, "CONFIRMED")
+    record(folder, "REJECTED", "R2a:CE-2026-06-0004", "sonja", REVIEW_AT + timedelta(hours=1),
+           "NEEDS_EVIDENCE", "check the tax rate with the custodian")
+    return build_graph(folder)
+
+
+REVIEW_AT = datetime(2026, 7, 3, 10, 0, tzinfo=timezone.utc)
+
+
+def test_a_reviewed_run_adds_decisions_and_the_person(reviewed):
+    assert (reviewed.count_nodes(), reviewed.count_edges()) == (57, 98)
+    assert _count(reviewed, "Decision") == 2
+    assert reviewed.node("person:sonja").properties.get("kind") == "person"
+
+
+def test_a_decision_says_what_why_who_and_about_what(reviewed):
+    decision = reviewed.node(f"{RUN_ID}:D2")
+    assert decision.properties.get("kind") == "REJECTED"
+    assert decision.properties.get("reason_code") == "NEEDS_EVIDENCE"
+    assert decision.properties.get("reason") == "check the tax rate with the custodian"
+    assert reviewed.has_edge(f"{RUN_ID}:D2", finding_node_id(RUN_ID, "R2a:CE-2026-06-0004"))
+    assert reviewed.edge(f"{RUN_ID}:D2", "person:sonja").layer_names == ["MADE_BY"]
+
+
+def test_the_graph_remembers_the_status_before_and_after_the_decision(reviewed):
+    finding = finding_node_id(RUN_ID, "R5:CE-2026-06-0011")
+    before = reviewed.before(REVIEW_AT)
+    assert before.node(finding).properties.get("status") == "PROPOSED"
+    assert not before.has_node(f"{RUN_ID}:D1")              # not decided yet at that moment
+    assert reviewed.node(finding).properties.get("status") == "APPROVED"
+
+
+def test_a_review_snapshot_is_saved_next_to_the_rules_one(g, reviewed, tmp_path):
+    rules = save_snapshot(g, tmp_path, "rules", RUN_AT)
+    review = save_snapshot(reviewed, tmp_path, "review", REVIEW_AT)
+    assert load_snapshot(rules).count_nodes() == 54         # the rules version, unchanged
+    assert describe(load_snapshot(review)) == describe(reviewed)

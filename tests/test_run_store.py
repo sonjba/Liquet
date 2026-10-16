@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 
 from run_month import ingest
-from run_store import (InputsChangedError, fingerprints, load_data, load_run, new_run_folder,
-                       next_run_folder, run_folder_name, save_data, save_received,
-                       save_results)
+from run_store import (InputsChangedError, fingerprints, load_liquet_format, load_run,
+                       new_run_folder, next_run_folder, run_folder_name, save_liquet_format,
+                       save_received, save_results)
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)
@@ -74,19 +74,19 @@ def test_a_file_that_changed_after_it_was_read_stops_the_run(tmp_path):
 # ---------------- data ----------------
 
 def test_data_is_three_liquet_files(june_data, tmp_path):
-    save_data(tmp_path, june_data)
-    assert sorted(p.name for p in (tmp_path / "data").iterdir()) == [
+    save_liquet_format(tmp_path, june_data)
+    assert sorted(p.name for p in (tmp_path / "liquet_format").iterdir()) == [
         "bank_statement.json", "firm_canonical.json", "firm_cash_entries.json"]
 
 
 def test_data_loads_back_exactly_as_it_was_saved(june_data, tmp_path):
-    save_data(tmp_path, june_data)
-    assert load_data(tmp_path) == june_data
+    save_liquet_format(tmp_path, june_data)
+    assert load_liquet_format(tmp_path) == june_data
 
 
 def test_money_and_dates_come_back_as_decimal_and_date(june_data, tmp_path):
-    save_data(tmp_path, june_data)
-    statement = load_data(tmp_path)["bank_statement"]
+    save_liquet_format(tmp_path, june_data)
+    statement = load_liquet_format(tmp_path)["bank_statement"]
     assert statement["header"]["closing_balance"] == Decimal("285378.57")
     assert statement["header"]["period_end"] == date(2026, 6, 30)
     line = statement["lines"][1]
@@ -95,14 +95,14 @@ def test_money_and_dates_come_back_as_decimal_and_date(june_data, tmp_path):
 
 
 def test_money_is_saved_as_text(june_data, tmp_path):
-    save_data(tmp_path, june_data)
-    saved = json.loads((tmp_path / "data" / "bank_statement.json").read_text())
+    save_liquet_format(tmp_path, june_data)
+    saved = json.loads((tmp_path / "liquet_format" / "bank_statement.json").read_text())
     assert saved["lines"][1]["amount"] == "-4852.40"
 
 
 def test_a_run_without_data_says_so(tmp_path):
-    with pytest.raises(FileNotFoundError, match="no data/ folder"):
-        load_data(tmp_path)
+    with pytest.raises(FileNotFoundError, match="no liquet_format/ folder"):
+        load_liquet_format(tmp_path)
 
 
 # ---------------- results ----------------

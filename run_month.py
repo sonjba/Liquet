@@ -30,8 +30,8 @@ from firm_connector import FirmFileConnector
 from firm_prepare import firm_items
 from match import match
 from match_checks import check_match_result
-from run_store import (fingerprints, load_data, new_run_folder, save_data, save_received,
-                       save_results)
+from run_store import (fingerprints, load_liquet_format, new_run_folder, save_liquet_format,
+                       save_received, save_results)
 
 STAGES = ["receive", "ingest", "store", "prepare", "match", "check", "save"]
 
@@ -59,8 +59,8 @@ def store(runs_dir: Path, sources: dict[str, Path], read_fingerprints: dict[str,
     and read the data back. Returns (folder, received, data as stored)."""
     folder = new_run_folder(runs_dir, data["bank_statement"]["header"])
     received = save_received(folder, sources, read_fingerprints)
-    save_data(folder, data)
-    stored = load_data(folder)
+    save_liquet_format(folder, data)
+    stored = load_liquet_format(folder)
     if stored != data:
         raise ValueError(f"{folder}/data: reading the saved data back does not give "
                          f"the same data; stopping before matching")
