@@ -29,7 +29,8 @@ def open_items(run_folder: Path) -> list[dict]:
     items = []
     for side in ("bank", "firm"):
         for entry in run["leftovers"][side]:
-            items.append({"item_id": entry["id"], "kind": "UNMATCHED", "side": side,
+                        items.append({"item_id": entry["id"], "kind": "UNMATCHED", "side": side,
+                          "date": entry["date"],
                           "amount": entry["amount"], "entry_type": entry["entry_type"],
                           "description": entry["description"]})
 

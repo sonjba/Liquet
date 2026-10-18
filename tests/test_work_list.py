@@ -44,3 +44,7 @@ def test_a_difference_a_finding_explains_is_not_open(items):
     # L5's -225.00 is covered by R2a's finding, which waits for a person instead
     assert "ACC-KRW-CASH-01:2026-06:L5" not in items
     assert "CE-2026-06-0004" not in items
+
+def test_unmatched_items_carry_their_date(items):
+    assert items["ACC-KRW-CASH-01:2026-06:L12"]["date"] == "2026-06-30"
+    assert items["CE-2026-06-0008"]["date"] == "2026-06-19"   # 11 days before month end
