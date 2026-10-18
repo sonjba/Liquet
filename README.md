@@ -131,19 +131,25 @@ Liquet runs in two phases that work differently.
 The order never changes, nothing loops back, and the same input always gives the same result.
 This is the part described above.
 
-**Phase 2 — Investigation (a loop).** What the rules could not settle goes to the agent.
-It calls a tool, reads the result, and decides what to look at next. It proposes an explanation;
-a person approves it or sends it back, and the agent looks again. The steps can't be drawn in
-advance, because each one depends on what the last one found.
+**Phase 2 — Investigation.** What the rules could not settle goes to the agent, Quaestor.
+Today that is one call to Claude per open item. Code gathers the facts about the item
+first: what the other side has for the same amount, which of those records a rule has
+already matched to someone else, and, for a group match with a difference, the entries
+inside it and their total. Claude answers in a fixed form: an explanation, or `NON LIQUET`
+with what would settle it. Code then checks the answer before it is saved as a proposal.
+The adjustment has to close the item exactly, or the proposal is refused.
 
-Two rules keep the loop safe:
+The next step is a loop for what that first call can't explain. The agent gets a small
+menu of tested tools, picks one, reads the result and decides what to look at next.
+The steps can't be drawn in advance, because each one depends on what the last one found.
 
-- **It is bounded.** There is a limit on tool calls per investigation and on review rounds.
-  If the limit is reached without enough evidence, the answer is `NON LIQUET` and a person decides.
-- **The record never loops.** Every proposal, approval and rejection is a new event added to the
-  run's review log, never an edit. The process can go round; the history only moves forward.
+Two rules keep it safe:
 
-The temporal graph is used by both phases. It is the evidence they work from, not the order they run in.
+- **It is bounded.** There will be a limit on tool calls per investigation. If the limit
+  is reached without enough evidence, the answer is `NON LIQUET` and a person decides.
+- **The record never loops.** Every proposal, decision and call to Claude is a new line
+  added to the run's logs, never an edit. The process can go round; the history only
+  moves forward.
 
 ---
 
@@ -164,7 +170,14 @@ That lets the graph answer questions a table can't answer directly:
 - "Which entries fall in the first half of the month?" → `g.window("2026-06-01", "2026-06-16")`
 - "Whose money is this?" → entry → portfolio → client, in one walk
 
-For June, the graph has 52 nodes and 92 edges: clients, portfolios, the account, securities, trades, cash entries, the bank statement and its lines, and the findings, joined by ownership, settlement, match and explanation edges.
+For June, after the rules, the graph has 54 nodes and 94 edges: clients, portfolios, the
+account, securities, trades, cash entries, the bank statement and its lines, the findings,
+and who proposed them, joined by ownership, settlement, match and explanation edges.
+After Claude's investigation and a person's review it has 68 nodes and 130 edges. Each
+call to Claude is an `Investigation` node, linked to the item it was about, the records
+it was shown, and the proposal it led to. A `NON LIQUET` stays in the graph too, as an
+investigation that led to nothing. Each decision links to what it decided and the person
+who made it. The agent proposes, but it never appears as the one who decided.
 
 **Something I found along the way.** In my tests on Raphtory 0.17.0, saving a graph with `save_to_file` dropped `Decimal` properties without any error, which for money is the worst kind of failure. Parquet (`to_parquet` / `from_parquet`) kept them. So Liquet saves snapshots as Parquet, loads each one straight back, and compares it with the original before it counts as saved. A snapshot that loses anything stops the save.
 
@@ -209,6 +222,19 @@ It is to examine:
 - whether the reasoning can be traced;
 - when the agent correctly refuses to conclude;
 - and whether the graph provides useful context for investigation.
+
+### First result
+
+On the June fixture, which has six known breaks, the rules explain two (a withholding tax
+and a trade settling after the month). Claude, with one call per open item, proposes the
+right explanation for three more: an unbooked custody fee, unbooked interest, and a
+management fee recorded as 473.50 instead of 437.50. For the last one, a subscription
+that only reaches the bank on 1 July, it answers `NON LIQUET`. That's correct: June's data
+can't explain it, and Claude asked for the next month's statement.
+
+**RIGHT 5, WRONG 0, OPEN 1**, in a fresh run, scored by code against the answer key
+(`score.py`). The agent never sees the answer key. One run on data I built myself shows
+the method works. It doesn't show it works on real data.
 
 ---
 
@@ -267,17 +293,31 @@ It separates three things:
 
 ## Status
 
+## Status
+
 Built so far:
 
-- **The door.** Bank statement reader (CSV + header) with type conversion, input validation and self-checks (totals, running balance, dates). Firm connector with path-based mapping into canonical collections, and canonical checks. A continuity check between statements (same account, no gap or overlap, opening equals previous closing).
-- **Store.** One folder per run, never overwritten: received files with fingerprints, Liquet-format data, results.
-- **Matching rules R1–R5** (plus R2a for overseas withholding tax), and checks after matching: nothing matched twice, nothing lost.
-- **Temporal graph** in Raphtory, rebuilt from the run folder, with checked Parquet snapshots and an interactive view.
+- **The door.** Bank statement reader (CSV + header) with type conversion, input validation
+  and self-checks (totals, running balance, dates). Firm connector with path-based mapping
+  into canonical collections, and canonical checks. A continuity check between statements.
+- **Store.** One folder per run, never overwritten: received files with fingerprints,
+  Liquet-format data, results.
+- **Matching rules R1–R5** (plus R2a for overseas withholding tax), and checks after
+  matching: nothing matched twice, nothing lost.
+- **The work list.** What the rules left open, worked out from the run folder alone.
+- **Investigation, tier 1.** Code gathers the facts for each open item (`facts.py`), Claude
+  answers in a fixed form (`investigate.py`), and the answer is checked before it becomes
+  a proposal (`propose.py`). Every call is logged, `NON LIQUET` included, and can be
+  replayed from the log for free.
+- **Review.** A person approves or rejects each finding and proposal, with a reason
+  (`decide.py`). Only a person decides.
+- **Temporal graph** in Raphtory, rebuilt from the run folder, with checked Parquet snapshots
+  after the rules, after Claude and after review.
+- **Score.** Each run checked against the answer key (`score.py`).
 - **Tests** for each part, including tests that fail if code after the door imports the door.
 
-For the June fixture, the rules make 15 decisions and 2 findings, and leave 2 bank lines and 1 firm entry for the agent.
-
-Next: the review log (approvals, rejections and agent proposals as events), the agent and its tools, the month-end report, and evaluation against the answer key.
+Next: the tool loop for what one call can't explain, closing a month and carrying open items
+into the next, and a July fixture. The plan is in [`docs/later.md`](docs/later.md).
 
 ---
 
@@ -291,12 +331,17 @@ python -m venv .venv
 pip install -r requirements.txt
 
 pytest -q
-
-python run_month.py --header tests/fixtures/2026-06/statement_header.json --lines tests/fixtures/2026-06/bank_statement.csv --accounts tests/fixtures/2026-06/firm/accounts.json --portfolios tests/fixtures/2026-06/firm/portfolios.json
-
-python build_graph.py runs/ACC-KRW-CASH-01_2026-06/run-001 --snapshot
-python show_graph.py runs/ACC-KRW-CASH-01_2026-06/run-001
+python whole_loop.py
 ```
+
+`whole_loop.py` runs June from start to finish, through the same commands a person types:
+the rules, Claude's investigation, the graph after each stage, a person's decisions (a demo),
+and the score. By default it replays Claude's real answers from an earlier run, so it needs
+no API key and costs nothing.
+
+To ask Claude for real, put your key in a `.env` file (see `.env.example`; `.env` is never
+committed) and run `python whole_loop.py --live`. It stops before the decisions, because a
+person makes those.
 
 ---
 
@@ -310,6 +355,8 @@ All data in this repository is synthetic. No real company, client or bank data i
 - The firm profile, the June statement (`tests/fixtures/2026-06/`) and the
   test cases (`tests/fixtures/cases/`) were generated with help from an AI
   assistant (Claude) and checked by me.
+- `tests/fixtures/2026-06/claude_answers.jsonl` holds Claude's real answers from one run,
+  so the loop and tests can replay them without calling the API.
 
 ## Credits
 
@@ -326,7 +373,9 @@ design decisions and the final result.
 
 ## Future work
 
-Ideas for later versions, roughly in order. None of these are built yet.
+The next steps (closing a month, timing rules across months, a calendar connector, the
+tool loop) are planned in [`docs/later.md`](docs/later.md). The ideas below are further out.
+None of these are built yet.
 
 **Learning from repeated investigations**
 Every agent run is logged: the question, the tools called with their inputs, and the result.
