@@ -69,13 +69,16 @@ def record_of(record_id, run_data):
     for line in run_data["bank_side_data"]:
         if line["line_id"] == record_id:
             return {"id": record_id, "side": "bank", "date": str(line["date"]),
-                    "amount": str(line["amount"]), "reference": line["reference"],
-                    "description": line["description"], "party": None}
+                    "expected_date": str(line["date"]), "amount": str(line["amount"]),
+                    "reference": line["reference"], "entry_type": line["entry_type"],
+                    "description": line["description"], "party": None, "domicile": None}
     for entry in run_data["firm_side_data"]:
         if entry["id"] == record_id:
             return {"id": record_id, "side": "firm", "date": str(entry["date"]),
-                    "amount": str(entry["amount"]), "reference": entry["reference"],
-                    "description": entry["description"], "party": entry["party"]}
+                    "expected_date": str(entry["expected_date"]), "amount": str(entry["amount"]),
+                    "reference": entry["reference"], "entry_type": entry["entry_type"],
+                    "description": entry["description"], "party": entry["party"],
+                    "domicile": entry["domicile"]}
     raise ValueError(f"{record_id} is not in this run's data")
 
 

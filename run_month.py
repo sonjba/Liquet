@@ -32,8 +32,9 @@ from match import match
 from match_checks import check_match_result
 from run_store import (fingerprints, load_liquet_format, new_run_folder, save_liquet_format,
                        save_received, save_results)
+from carry import carried_items, previous_closing, save_brought_forward
 
-STAGES = ["receive", "ingest", "store", "prepare", "match", "check", "save"]
+STAGES = ["receive", "ingest", "store", "bring_forward", "prepare", "match", "check", "save"]
 
 
 # ---------------- the door: the only stage that knows outside formats ----------------
@@ -79,22 +80,30 @@ def main(sources: dict[str, Path], runs_dir: Path, run_at: datetime) -> dict:
     # 2. ingest (the door)
     ingested = ingest(sources)
 
+    # last month must be final before this month can start (checked before anything is saved)
+    closing = previous_closing(runs_dir, ingested["bank_statement"]["header"])
+
     # 3. store, and from here on use only what was stored
     month["folder"], received, data = store(runs_dir, sources, read_fingerprints, ingested)
     month["header"] = data["bank_statement"]["header"]
 
-    # 4. prepare both sides in the same shape for matching
-    month["bank_items"] = bank_items(data["bank_statement"])
-    month["firm_items"] = firm_items(data["firm_canonical"], data["firm_cash_entries"])
+    # 4. bring forward what last month's final run carried, kept in this run
+    carried = carried_items(save_brought_forward(month["folder"], closing) if closing else None)
 
-    # 5. match
+    # 5. prepare both sides in the same shape for matching, carried items included
+    month["bank_items"] = (bank_items(data["bank_statement"])
+                           + [item for item in carried if item["side"] == "bank"])
+    month["firm_items"] = (firm_items(data["firm_canonical"], data["firm_cash_entries"])
+                           + [item for item in carried if item["side"] == "firm"])
+
+    # 6. match (R0 first: what last month carried)
     month["result"] = match(month["bank_items"], month["firm_items"],
                             period_end=month["header"]["period_end"])
 
-    # 6. check: nothing matched twice, nothing lost (stops the run if not)
+    # 7. check: nothing matched twice, nothing lost (stops the run if not)
     check_match_result(month["bank_items"], month["firm_items"], month["result"])
 
-    # 7. save the results: the handover to the agent and the person
+    # 8. save the results: the handover to the agent and the person
     save_results(month["folder"], month["header"], month["result"], run_at, received, STAGES)
     return month
 

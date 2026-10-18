@@ -6,6 +6,8 @@ Written 18 October 2026, while polishing the June loop. Nothing here is built ye
 
 - `close_month.py`: a person marks a run **final** and writes `closing.json`:
   what is carried into next month and why. Refuses if a proposal is still waiting.
+- A rejected rule finding leaves its items with no explanation, and the work list doesn't
+  list them as open, so nothing can be proposed for them. close_month.py refuses for now.
 - A month may close with an unexplained item if it is **carried with a reason**
   (real reconciliations carry outstanding items and escalate them as they age).
 - Next month's run reads the previous **final** run's `closing.json`. It is Liquet's
@@ -28,6 +30,10 @@ Written 18 October 2026, while polishing the June loop. Nothing here is built ye
 - June's B1 (booked Friday 19 June, 7 working days before the end) must NOT be caught by
   R6: it is unusual, not normal timing. July's R0 should clear it as **late**.
   Its date cannot move: it makes the R4 decoy work.
+- Book corrections as journal entries: the firm's corrections (dated in the month they
+  belong to, entered later) as cash-book entries with their own types, each linked to the
+  approved finding or proposal it carries out. Until then, July's fixture reflects June's
+  corrections in its 30 June balance only. The answer keys' "journal" field is for this.
 
 ### Edge cases to cover
 

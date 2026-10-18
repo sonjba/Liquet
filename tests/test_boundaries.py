@@ -16,7 +16,7 @@ ROOT = Path(__file__).parent.parent
 
 DOOR = {"bank_reader", "bank_mapping", "firm_connector", "firm_mapping", "path_mapper"}
 
-AFTER_THE_DOOR = ["bank_prepare", "firm_prepare", "firm_checks", "match", "match_checks",
+AFTER_THE_DOOR = ["bank_prepare", "firm_prepare", "firm_checks", "match", "match_checks", "carry",
                   "run_store","investigate", "build_graph", "show_graph"]
 
 

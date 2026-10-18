@@ -24,6 +24,7 @@ def match(bank_items: list[dict], firm_items: list[dict], period_end: date) -> d
     decisions = []
     findings = []
 
+    _rule_r0(open_bank, open_firm, decisions)
     _rule_r1(open_bank, open_firm, decisions)
     _rule_r2(open_bank, open_firm, decisions, findings)
     _rule_r3(open_bank, open_firm, decisions)
@@ -43,6 +44,36 @@ def _one_by_reference(bank: dict, open_firm: list[dict]) -> dict | None:
         return None
     candidates = [firm for firm in open_firm if firm["reference"] == bank["reference"]]
     return candidates[0] if len(candidates) == 1 else None
+
+
+def _rule_r0(open_bank, open_firm, decisions) -> None:
+    """R0 - A carried item clears: a firm entry brought forward from last month is paid
+    by exactly one bank line with the same reference and amount, on or after the date it
+    was expected. Later than DATE_TOLERANCE after that date, it cleared late."""
+    for firm in [item for item in open_firm if item.get("brought_forward")]:
+        if firm["reference"] is None:
+            continue
+        candidates = [bank for bank in open_bank
+                      if bank["reference"] == firm["reference"]
+                      and bank["amount"] == firm["amount"]
+                      and bank["date"] >= firm["expected_date"]]
+        if len(candidates) != 1:
+            continue
+        bank = candidates[0]
+        lag = bank["date"] - firm["expected_date"]
+        decisions.append({
+            "bank_id": bank["id"],
+            "firm_id": firm["id"],
+            "verdict": "CONGRUIT",
+            "rule": "R0",
+            "differences": [],
+            "evidence": {"reference": bank["reference"], "lag_days": lag.days,
+                         "late": lag > DATE_TOLERANCE,
+                         "carried_from": firm["brought_forward"]["from_run"],
+                         "carried_as": firm["brought_forward"]["status"]},
+        })
+        open_bank.remove(bank)
+        open_firm.remove(firm)
 
 
 def _rule_r1(open_bank, open_firm, decisions) -> None:

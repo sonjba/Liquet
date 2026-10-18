@@ -1,0 +1,100 @@
+{
+  "month": "2026-07",
+  "account_id": "ACC-KRW-CASH-01",
+  "balances": {
+    "book_opening": "286661.57",
+    "book_closing": "292767.07",
+    "bank_opening": "285378.57",
+    "bank_closing": "292707.07",
+    "adjusted_bank": "292707.07",
+    "adjusted_book": "292707.07",
+    "true_cash_balance": "292707.07"
+  },
+  "note": "Bank lines are identified by their line number in bank_statement.csv (header = line 1). The book opening is June's closing after June's approved corrections (-225.00, -45.00, +212.37, +36.00), which the firm booked dated June.",
+  "carried_in": [
+    {
+      "from": "2026-06",
+      "entry": "CE-2026-06-0008",
+      "status": "UNEXPLAINED",
+      "bank_line": 2,
+      "how": "Same reference CL-005-SUB-0619 and amount; arrives 1 July, 12 days after the firm booked it on 19 June: cleared, late"
+    },
+    {
+      "from": "2026-06",
+      "entry": "CE-2026-06-0011",
+      "status": "EXPECTED",
+      "bank_line": 3,
+      "how": "Trade TR-26062901 settles 1 July, as June's R5 finding expected: cleared, on time"
+    }
+  ],
+  "matches": [
+    {
+      "bank_line": 4,
+      "entries": [
+        "CE-2026-07-0001"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Same reference and amount"
+    },
+    {
+      "bank_line": 5,
+      "entries": [
+        "CE-2026-07-0002"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Same reference and amount"
+    },
+    {
+      "bank_line": 7,
+      "entries": [
+        "CE-2026-07-0004"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "Trade reference; bank date = settlement date (20 July)"
+    },
+    {
+      "bank_line": 8,
+      "entries": [
+        "CE-2026-07-0005",
+        "CE-2026-07-0006",
+        "CE-2026-07-0007",
+        "CE-2026-07-0008",
+        "CE-2026-07-0009"
+      ],
+      "verdict": "CONGRUIT",
+      "how": "One transfer for the five July fees, same reference; they add up exactly this month"
+    }
+  ],
+  "breaks": [
+    {
+      "id": "B1",
+      "category": "OMISSUM",
+      "type": "BANK_FEE",
+      "entries": [
+        "CE-2026-07-0003"
+      ],
+      "bank_lines": [
+        6
+      ],
+      "amount": "15.00",
+      "adjust_side": "book",
+      "adjustment": "-15.00",
+      "explanation": "Thomas Reid's 5,000.00 subscription arrived by SWIFT with 15.00 charges deducted; the charge is not in the cash book.",
+      "journal": null
+    },
+    {
+      "id": "B2",
+      "category": "OMISSUM",
+      "type": "BANK_FEE",
+      "entries": [],
+      "bank_lines": [
+        9
+      ],
+      "amount": "45.00",
+      "adjust_side": "book",
+      "adjustment": "-45.00",
+      "explanation": "July custody fee charged by Northgate, not yet recorded, as in June.",
+      "journal": null
+    }
+  ]
+}

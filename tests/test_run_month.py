@@ -32,7 +32,8 @@ def test_a_run_folder_holds_received_data_and_results(june):
 
 def test_run_json_lists_the_stages_in_order(june):
     run = load_run(june["folder"])["run"]
-    assert run["stages"] == ["receive", "ingest", "store", "prepare", "match", "check", "save"]
+    assert run["stages"] == ["receive", "ingest", "store", "bring_forward", "prepare", "match",
+                             "check", "save"]
     assert set(run["received"]) == {"header", "lines", "accounts", "portfolios"}
 
 
