@@ -48,3 +48,9 @@ def test_a_difference_gets_its_bank_line_entries_and_total(run):
     assert facts["bank_line"].endswith("-1562.50 TRANSFER KRW FEE ACCOUNT")
     assert len(facts["firm_entries_in_the_match"]) == 5
     assert facts["firm_entries_total"] == "-1598.50"          # 36.00 more than the bank
+
+
+def test_facts_say_which_records_were_examined(run):
+    assert facts_for(run, "CE-2026-06-0008")["examined"] == ["ACC-KRW-CASH-01:2026-06:L8"]
+    assert facts_for(run, "ACC-KRW-CASH-01:2026-06:L12")["examined"] == []
+    assert len(facts_for(run, "ACC-KRW-CASH-01:2026-06:L11")["examined"]) == 5

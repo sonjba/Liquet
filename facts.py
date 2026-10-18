@@ -23,15 +23,24 @@ def load_run_data(run_folder):
             "matched_to": matched_to}
 
 
+def note_if_matched(text, record_id, run_data):
+    """Say who a line or entry already belongs to, so Claude is not misled by a decoy."""
+    if record_id in run_data["matched_to"]:
+        return f"{text} (already matched to {run_data['matched_to'][record_id]})"
+    return text
+
+
 def firm_entries_with_same_amount(open_item, run_data):
     """A bank line with no partner: does the firm's book have the same amount?"""
     if open_item["kind"] != "UNMATCHED" or open_item["side"] != "bank":
         return {}
     amount = Decimal(open_item["amount"])
+    same = [entry for entry in run_data["firm_side_data"] if entry["amount"] == amount]
     return {"firm_entries_with_the_same_amount": [
-        note_if_matched(f"{entry['id']} {entry['date']} {entry['amount']} {entry['description']}",
-                        entry["id"], run_data)
-        for entry in run_data["firm_side_data"] if entry["amount"] == amount]}
+                note_if_matched(f"{entry['id']} {entry['date']} {entry['amount']} {entry['description']}",
+                                entry["id"], run_data)
+                for entry in same],
+            "examined": [entry["id"] for entry in same]}
 
 
 def bank_lines_with_same_amount(open_item, run_data):
@@ -39,17 +48,12 @@ def bank_lines_with_same_amount(open_item, run_data):
     if open_item["kind"] != "UNMATCHED" or open_item["side"] != "firm":
         return {}
     amount = Decimal(open_item["amount"])
+    same = [line for line in run_data["bank_side_data"] if line["amount"] == amount]
     return {"bank_lines_with_the_same_amount": [
-        note_if_matched(f"{line['line_id']} {line['date']} {line['amount']} {line['description']}",
-                        line["line_id"], run_data)
-        for line in run_data["bank_side_data"] if line["amount"] == amount]}
-
-
-def note_if_matched(text, record_id, run_data):
-    """Say who a line or entry already belongs to, so Claude is not misled by a decoy."""
-    if record_id in run_data["matched_to"]:
-        return f"{text} (already matched to {run_data['matched_to'][record_id]})"
-    return text
+                note_if_matched(f"{line['line_id']} {line['date']} {line['amount']} {line['description']}",
+                                line["line_id"], run_data)
+                for line in same],
+            "examined": [line["line_id"] for line in same]}
 
 
 def entries_in_the_match(open_item, run_data):
@@ -65,10 +69,12 @@ def entries_in_the_match(open_item, run_data):
             "firm_entries_in_the_match": [
                 f"{entry['id']} {entry['date']} {entry['amount']} {entry['description']}"
                 for entry in entries],
-            "firm_entries_total": f"{sum(entry['amount'] for entry in entries):.2f}"}
+            "firm_entries_total": f"{sum(entry['amount'] for entry in entries):.2f}",
+            "examined": [entry["id"] for entry in entries]}
 
 
 CHECKS = [firm_entries_with_same_amount, bank_lines_with_same_amount, entries_in_the_match]
+
 
 def facts_for(run_folder, item_id):
     """Everything Claude should know about one open item, gathered by code."""
@@ -78,8 +84,12 @@ def facts_for(run_folder, item_id):
     open_item = open_by_id[item_id]
     run_data = load_run_data(run_folder)
     facts = {"open_item": open_item}
+    examined = []
     for check in CHECKS:
-        facts.update(check(open_item, run_data))
+        found = check(open_item, run_data)
+        examined += found.pop("examined", [])
+        facts.update(found)
+    facts["examined"] = examined
     return facts
 
 

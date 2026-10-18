@@ -80,6 +80,7 @@ def build_graph(run_folder: Path) -> Graph:
     _add_findings(g, saved["findings"], run)
     _add_proposals(g, load_proposals(run_folder), run)
     _add_reviews(g, load_reviews(run_folder), run)
+    _add_investigations(g, load_investigations(run_folder), run)
     return g
 
 
@@ -236,6 +237,44 @@ def _add_reviews(g: Graph, reviews: list[dict], run: dict) -> None:
         g.add_edge(at, decision, person, layer="MADE_BY")
         g.add_node(at, finding, properties={"status": r["kind"], "decided_by": r["by"]})
 
+
+def load_investigations(run_folder: Path) -> list[dict]:
+    """Every call to Claude logged in RUN/investigations.jsonl, oldest first."""
+    path = Path(run_folder) / "investigations.jsonl"
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def _add_investigations(g: Graph, investigations: list[dict], run: dict) -> None:
+    """Each call to Claude, at the moment it was made:
+      Investigation node  (what Claude was asked, what it answered, what it cost)
+        --INVESTIGATED-->  the open item it was about
+        --EXAMINED-->      each record its facts showed Claude (e.g. a decoy's bank line)
+        --RUN_BY-->        the agent (an Actor)
+        --PRODUCED-->      the proposal it led to, if one was saved
+    Lines logged before "by" and "examined" were added have no EXAMINED edges,
+    and were all run by Quaestor."""
+    for number, inv in enumerate(investigations, start=1):
+        at = datetime.fromisoformat(inv["at"])
+        node_id = f"{run['run_id']}:I{number}"
+        g.add_node(at, node_id, node_type="Investigation",
+                   properties={"item_id": inv["item_id"], "model": inv["model"],
+                               "answer": inv["answer"]["answer"],
+                               "explanation": inv["answer"]["explanation"],
+                               "outcome": inv["outcome"], "question": inv["question"],
+                               "input_tokens": inv["input_tokens"],
+                               "output_tokens": inv["output_tokens"],
+                               "stop_reason": inv["stop_reason"], "run_id": run["run_id"]})
+        g.add_edge(at, node_id, inv["item_id"], layer="INVESTIGATED")
+        for record_id in inv.get("examined", []):
+            g.add_edge(at, node_id, record_id, layer="EXAMINED")
+        g.add_edge(at, node_id, _add_actor(g, at, "agent", inv.get("by", "quaestor")),
+                   layer="RUN_BY")
+        if inv["proposal_id"]:
+            g.add_edge(at, node_id, finding_node_id(run["run_id"], inv["proposal_id"]),
+                       layer="PRODUCED")
 
 def _add_actor(g: Graph, at: datetime, kind: str, name: str) -> str:
     """Whoever proposes or decides: a person, a rule, or (later) the agent.

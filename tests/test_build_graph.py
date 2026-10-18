@@ -280,3 +280,40 @@ def test_a_proposal_is_a_finding_with_its_proposer(june_run, tmp_path):
     assert [e.dst.name for e in g.valid_layers(["EXPLAINS_LINE"]).node(node).out_edges] == [l12]
     assert g.before(REVIEW_AT + timedelta(minutes=30)).node(node).properties.get("status") == "PROPOSED"
     assert g.node(node).properties.get("status") == "APPROVED"
+
+
+def test_an_investigation_records_what_claude_was_asked_and_what_it_led_to(june_run, tmp_path):
+    from propose import record_proposal
+    from run_store import load_run
+    folder = tmp_path / "run-001"
+    shutil.copytree(june_run, folder)
+    l12, ce8 = "ACC-KRW-CASH-01:2026-06:L12", "CE-2026-06-0008"
+    record_proposal(folder, [l12], "OMISSUM", "BANK_FEE", "book", "-45.00",
+                    "June custody fee, not yet booked.", "quaestor", "agent", REVIEW_AT,
+                    model="claude-sonnet-5-5")
+    calls = [  # as try_claude.py logs them: one proposal, one NON_LIQUET
+        {"at": REVIEW_AT.isoformat(), "item_id": l12, "model": "claude-sonnet-5-5",
+         "question": "Facts gathered by Liquet: ...", "outcome": "saved as P1", "proposal_id": "P1",
+         "answer": {"answer": "PROPOSAL", "explanation": "June custody fee, not yet booked."},
+         "input_tokens": 1031, "output_tokens": 180, "stop_reason": "end_turn"},
+        {"at": REVIEW_AT.isoformat(), "item_id": ce8, "model": "claude-sonnet-5-5",
+         "question": "Facts gathered by Liquet: ...", "outcome": "NON_LIQUET, nothing proposed",
+         "proposal_id": None,
+         "answer": {"answer": "NON_LIQUET", "explanation": "Needs next month's statement."},
+         "input_tokens": 1096, "output_tokens": 236, "stop_reason": "end_turn"}]
+    (folder / "investigations.jsonl").write_text(
+        "".join(json.dumps(c) + "\n" for c in calls), encoding="utf-8")
+
+    g = build_graph(folder)
+    run_id = load_run(folder)["run"]["run_id"]
+    first, second = f"{run_id}:I1", f"{run_id}:I2"
+    assert g.node(first).node_type == "Investigation"
+    assert g.node(first).properties.get("input_tokens") == 1031
+    assert [e.dst.name for e in g.valid_layers(["INVESTIGATED"]).node(first).out_edges] == [l12]
+    assert [e.dst.name for e in g.valid_layers(["RUN_BY"]).node(first).out_edges] == ["agent:quaestor"]
+    assert [e.dst.name for e in g.valid_layers(["PRODUCED"]).node(first).out_edges] == [
+        finding_node_id(run_id, "P1")]
+    # a NON_LIQUET is kept in the graph too, and led to nothing
+    assert g.node(second).properties.get("answer") == "NON_LIQUET"
+    assert [e.dst.name for e in g.valid_layers(["INVESTIGATED"]).node(second).out_edges] == [ce8]
+    assert list(g.valid_layers(["PRODUCED"]).node(second).out_edges) == []

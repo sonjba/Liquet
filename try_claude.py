@@ -55,6 +55,7 @@ def already_proposed(run):
 def investigate(client, run, item_id):
     """One call to Claude about one open item; the answer checked, saved and logged."""
     facts = facts_for(run, item_id)
+    examined = facts.pop("examined")          # ids for the graph; Claude reads the sentences
     question = ("Facts gathered by Liquet:\n" + json.dumps(facts, indent=2) +
                 "\n\nPropose an explanation, or answer NON_LIQUET if the facts are not enough.")
 
@@ -87,6 +88,7 @@ def investigate(client, run, item_id):
         outcome = "NON_LIQUET, nothing proposed"
 
     investigation = {"at": datetime.now(timezone.utc).isoformat(), "item_id": item_id,
+                     "by": "quaestor", "examined": examined,
                      "model": MODEL, "job": job, "question": question,
                      "answer": answer, "outcome": outcome, "proposal_id": proposal_id,
                      "input_tokens": response.usage.input_tokens,
