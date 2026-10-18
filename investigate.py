@@ -1,7 +1,19 @@
+"""Ask Claude about the open items the rules left: tier 1, one call per item.
+
+    python investigate.py RUN                    every open item not already proposed
+    python investigate.py RUN ITEM_ID            one item
+    python investigate.py RUN --replay FILE      reuse answers Claude gave before (free)
+
+Code gathers the facts (facts.py), Claude answers in a fixed form, propose.py checks
+the answer before it is saved as a proposal for a person to decide. Every call,
+NON_LIQUET included, is logged in RUN/investigations.jsonl.
+"""
+
+import argparse
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import anthropic
 from dotenv import load_dotenv
@@ -52,8 +64,33 @@ def already_proposed(run):
             for item_id in proposal["item_ids"]}
 
 
-def investigate(client, run, item_id):
-    """One call to Claude about one open item; the answer checked, saved and logged."""
+class ReplayClaude:
+    """Gives back answers Claude really gave before, read from an investigations.jsonl.
+    It costs nothing and gives the same result every time: for the whole loop and tests.
+    It answers client.messages.create(...) like the real client, with only the parts
+    investigate() reads."""
+
+    def __init__(self, path):
+        with open(path, encoding="utf-8") as f:
+            lines = [json.loads(line) for line in f if line.strip()]
+        self.answers = {line["item_id"]: line for line in lines}   # the latest per item
+        self.messages = self
+
+    def create(self, **request):
+        question = request["messages"][0]["content"]
+        for item_id, logged in self.answers.items():
+            if f'"item_id": "{item_id}"' in question:
+                return SimpleNamespace(
+                    content=[SimpleNamespace(type="text", text=json.dumps(logged["answer"]))],
+                    usage=SimpleNamespace(input_tokens=logged["input_tokens"],
+                                          output_tokens=logged["output_tokens"]),
+                    stop_reason=logged["stop_reason"])
+        raise ValueError("the replay file has no answer for this question's open item")
+
+
+def investigate(client, run, item_id, source="claude"):
+    """One call to Claude about one open item; the answer checked, saved and logged.
+    `source` says where the answer came from: "claude", or "replay:<file>"."""
     facts = facts_for(run, item_id)
     examined = facts.pop("examined")          # ids for the graph; Claude reads the sentences
     question = ("Facts gathered by Liquet:\n" + json.dumps(facts, indent=2) +
@@ -88,7 +125,7 @@ def investigate(client, run, item_id):
         outcome = "NON_LIQUET, nothing proposed"
 
     investigation = {"at": datetime.now(timezone.utc).isoformat(), "item_id": item_id,
-                     "by": "quaestor", "examined": examined,
+                     "by": "quaestor", "examined": examined, "source": source,
                      "model": MODEL, "job": job, "question": question,
                      "answer": answer, "outcome": outcome, "proposal_id": proposal_id,
                      "input_tokens": response.usage.input_tokens,
@@ -100,19 +137,29 @@ def investigate(client, run, item_id):
 
 
 if __name__ == "__main__":
-    load_dotenv()
-    client = anthropic.Anthropic()
-    run = sorted(Path(r"runs\ACC-KRW-CASH-01_2026-06").glob("run-*"))[-1]
+    parser = argparse.ArgumentParser(description="Ask Claude about a run's open items.")
+    parser.add_argument("run_folder", type=Path)
+    parser.add_argument("item_id", nargs="?", help="one item; leave out for all open items")
+    parser.add_argument("--replay", type=Path,
+                        help="reuse answers from an investigations.jsonl instead of calling Claude")
+    args = parser.parse_args()
+    run = args.run_folder
 
-    if len(sys.argv) > 1:
-        item_ids = [sys.argv[1]]
+    if args.replay:
+        client, source = ReplayClaude(args.replay), f"replay:{args.replay.name}"
+    else:
+        load_dotenv()
+        client, source = anthropic.Anthropic(), "claude"
+
+    if args.item_id:
+        item_ids = [args.item_id]
     else:
         skip = already_proposed(run)
         item_ids = [item["item_id"] for item in open_items(run) if item["item_id"] not in skip]
         print(f"{len(item_ids)} open items to investigate ({len(skip)} already proposed)")
 
     for item_id in item_ids:
-        investigation = investigate(client, run, item_id)
+        investigation = investigate(client, run, item_id, source)
         print(f"{item_id}: {investigation['outcome']}")
         print(f"  {investigation['answer']['explanation']}")
         print(f"  tokens in {investigation['input_tokens']}, out {investigation['output_tokens']}")

@@ -51,3 +51,8 @@ def test_a_wrong_type_scores_wrong(run):
     record_proposal(run, ["ACC-KRW-CASH-01:2026-06:L13"], "OMISSUM", "BANK_FEE", "book",
                     "212.37", "Called it a fee, but it is interest.", "quaestor", "agent", AT)
     assert verdicts(run)["B5"] == "WRONG"
+
+def test_a_rejected_rule_finding_no_longer_counts(run):
+    from decide import record
+    record(run, "REJECTED", "R2a:CE-2026-06-0004", "sonja", AT, "NEEDS_EVIDENCE", "check the rate")
+    assert verdicts(run)["B3"] == "OPEN"

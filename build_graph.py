@@ -266,7 +266,8 @@ def _add_investigations(g: Graph, investigations: list[dict], run: dict) -> None
                                "outcome": inv["outcome"], "question": inv["question"],
                                "input_tokens": inv["input_tokens"],
                                "output_tokens": inv["output_tokens"],
-                               "stop_reason": inv["stop_reason"], "run_id": run["run_id"]})
+                               "stop_reason": inv["stop_reason"], "run_id": run["run_id"],
+                               "source": inv.get("source", "claude")})
         g.add_edge(at, node_id, inv["item_id"], layer="INVESTIGATED")
         for record_id in inv.get("examined", []):
             g.add_edge(at, node_id, record_id, layer="EXAMINED")

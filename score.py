@@ -9,12 +9,13 @@ from run_store import load_run
 
 
 def explanations(run):
-    """Every explanation in the run: the rules' findings, then proposals no person rejected."""
+    """Every explanation in the run that no person rejected: the rules' findings, then proposals."""
+    reviews = {review["finding_id"]: review["kind"] for review in load_reviews(run)}
     found = [{"by": f"rule:{finding['rule']}", "ids": finding["bank_ids"] + finding["firm_ids"],
               "category": finding["category"], "type": finding["type"],
               "adjusts": finding["adjusts"], "adjustment": finding["adjustment"]}
-             for finding in load_run(run)["findings"]]
-    reviews = {review["finding_id"]: review["kind"] for review in load_reviews(run)}
+             for finding in load_run(run)["findings"]
+             if reviews.get(finding["finding_id"]) != "REJECTED"]
     for proposal in load_proposals(run):
         if reviews.get(proposal["proposal_id"]) != "REJECTED":
             found.append({"by": f"{proposal['proposer']}:{proposal['proposed_by']}",
@@ -22,7 +23,6 @@ def explanations(run):
                           "category": proposal["category"], "type": proposal["type"],
                           "adjusts": proposal["adjusts"], "adjustment": proposal["adjustment"]})
     return found
-
 
 def score(run, answer_key):
     """Each break in the answer key: RIGHT, WRONG, or OPEN, and who explained it."""
