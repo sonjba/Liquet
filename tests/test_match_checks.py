@@ -2,12 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from bank_prepare import bank_to_item
+from liquet.matching.bank_prepare import bank_to_item
 from liquet.door.bank.bank_reader import read_statement
 from liquet.door.firm.firm_connector import FirmFileConnector
-from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
-from match import match
-from match_checks import (MatchCheckError, check_every_item_accounted_for,
+from liquet.matching.firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
+from liquet.matching.match import match
+from liquet.matching.match_checks import (MatchCheckError, check_every_item_accounted_for,
                           check_match_result, check_one_congruit_per_firm_item)
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

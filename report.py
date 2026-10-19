@@ -10,8 +10,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from bank_prepare import bank_items
-from firm_prepare import firm_items
+from liquet.matching.bank_prepare import bank_items
+from liquet.matching.firm_prepare import firm_items
 from run_month import show
 from liquet.store.run_store import load_liquet_format, load_run
 

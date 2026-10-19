@@ -23,13 +23,13 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bank_prepare import bank_items
+from liquet.matching.bank_prepare import bank_items
 from liquet.door.bank.bank_reader import read_statement
-from firm_checks import check_canonical
+from liquet.canonical.firm_checks import check_canonical
 from liquet.door.firm.firm_connector import FirmFileConnector
-from firm_prepare import firm_items
-from match import match
-from match_checks import check_match_result
+from liquet.matching.firm_prepare import firm_items
+from liquet.matching.match import match
+from liquet.matching.match_checks import check_match_result
 from liquet.store.run_store import (fingerprints, load_liquet_format, new_run_folder, save_liquet_format,
                        save_received, save_results)
 from carry import carried_items, previous_closing, save_brought_forward

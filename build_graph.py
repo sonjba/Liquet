@@ -51,7 +51,7 @@ from pathlib import Path
 
 from raphtory import Graph
 
-from firm_prepare import firm_items
+from liquet.matching.firm_prepare import firm_items
 from decide import load_reviews
 from propose import load_proposals
 from liquet.store.run_store import _to_text, load_liquet_format, load_run

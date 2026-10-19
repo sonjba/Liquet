@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from liquet.door.bank import bank_reader
-from bank_prepare import bank_items, bank_to_item
+from liquet.matching.bank_prepare import bank_items, bank_to_item
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 ITEM_KEYS = {"id", "side", "date", "expected_date", "amount",

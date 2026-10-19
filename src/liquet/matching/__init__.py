@@ -1,0 +1,1 @@
+"""Matching: both sides in one shape, the rules R0-R5, and the checks after."""

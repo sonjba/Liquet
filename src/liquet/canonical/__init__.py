@@ -1,0 +1,1 @@
+"""Checks on Liquet-format data: the firm's canonical collections must be sound before matching."""
