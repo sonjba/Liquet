@@ -84,7 +84,7 @@ def main(runs, live=False):
     print("\n5. A person decides (demo)")
     for action, finding, *reason in DECISIONS:
         if "Saved:" not in command("-m", "liquet.review.decide", run, action, finding,
-                                   "--by", "sonja", "--code", "CONFIRMED", *reason):
+        "--by", "sonja", "--code", "CONFIRMED", *reason):
             raise SystemExit("Stopped: a decision was not saved.")
 
     print("\n6. The graph after review")

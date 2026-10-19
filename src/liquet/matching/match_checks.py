@@ -1,6 +1,6 @@
 """Check the matching result before Liquet uses it (matching-rules.md, section 8).
 
-Like firm_checks.py: each check returns a list of problems, and
+Like canonical_checks.py each check returns a list of problems, and
 check_match_result() stops the run if there are any, listing them all.
 
 These checks guard the matching code itself. If a rule ever pairs one firm
