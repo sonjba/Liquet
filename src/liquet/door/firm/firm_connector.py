@@ -39,7 +39,7 @@ def load_json(path: Path) -> list[dict]:
     return json_data
 
 
-def to_canonical(raw_accounts: list[dict], raw_portfolios: list[dict]) -> dict[str, list[dict]]:
+def map_firm_records_to_canonical(raw_accounts: list[dict], raw_portfolios: list[dict]) -> dict[str, list[dict]]:
     """Everything Liquet needs from the firm, as canonical collections."""
     return {
         "accounts": to_accounts(raw_accounts),
@@ -141,7 +141,7 @@ def _one_per_id(records: list[dict], id_field: str, what: str) -> list[dict]:
 
 # ---------------- the functions Liquet asks for data through ----------------
 
-class FirmFileConnector:
+class JsonFirmConnector:
     """The firm's data, read from JSON files instead of the firm's database.
 
     It offers the same functions a database connector will offer (see
@@ -154,7 +154,7 @@ class FirmFileConnector:
     """
 
     def __init__(self, accounts_path: Path, portfolios_path: Path):
-        self.canonical = to_canonical(load_json(Path(accounts_path)),
+        self.canonical = map_firm_records_to_canonical(load_json(Path(accounts_path)),
                                       load_json(Path(portfolios_path)))
 
     def get_cash_entries(self, account_id: str, start: date, end: date) -> list[dict]:
@@ -178,7 +178,7 @@ class FirmFileConnector:
 
 if __name__ == "__main__":
     june = Path("tests/fixtures/2026-06/firm")
-    canonical = to_canonical(load_json(june / "accounts.json"),
+    canonical = map_firm_records_to_canonical(load_json(june / "accounts.json"),
                              load_json(june / "portfolios.json"))
     for collection, records in canonical.items():
         print(f"{collection}: {len(records)}")

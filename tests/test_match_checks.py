@@ -4,7 +4,7 @@ import pytest
 
 from liquet.matching.bank_prepare import bank_to_item
 from liquet.door.bank.bank_reader import read_statement
-from liquet.door.firm.firm_connector import FirmFileConnector
+from liquet.door.firm.firm_connector import JsonFirmConnector
 from liquet.matching.firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
 from liquet.matching.match import match
 from liquet.matching.match_checks import (MatchCheckError, check_every_item_accounted_for,
@@ -17,7 +17,7 @@ JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 def june():
     """June's prepared items and the real matching result."""
     header, lines = read_statement(JUNE / "statement_header.json", JUNE / "bank_statement.csv")
-    firm = FirmFileConnector(JUNE / "firm" / "accounts.json", JUNE / "firm" / "portfolios.json")
+    firm = JsonFirmConnector(JUNE / "firm" / "accounts.json", JUNE / "firm" / "portfolios.json")
     trades = {t["trade_id"]: t for t in firm.canonical["trades"]}
     parties = parties_by_portfolio(firm.canonical)
     domiciles = domiciles_by_ticker(firm.canonical)

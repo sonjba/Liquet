@@ -21,7 +21,7 @@ JUNE_START = date(2026, 6, 1)
 
 @pytest.fixture(scope="module")
 def june_output(june_accounts, june_portfolios):
-    return firm_connector.to_canonical(june_accounts, june_portfolios)
+    return firm_connector.map_firm_records_to_canonical(june_accounts, june_portfolios)
 
 
 @pytest.fixture

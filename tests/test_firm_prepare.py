@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from liquet.door.firm.firm_connector import FirmFileConnector
+from liquet.door.firm.firm_connector import JsonFirmConnector
 from liquet.matching.firm_prepare import (domiciles_by_ticker, expected_date, firm_to_item,
                           parties_by_portfolio, signed_amount)
 
@@ -42,7 +42,7 @@ DOMICILES = {"ABC": "overseas"}
 
 @pytest.fixture(scope="module")
 def june_items():
-    connector = FirmFileConnector(JUNE_FIRM / "accounts.json", JUNE_FIRM / "portfolios.json")
+    connector = JsonFirmConnector(JUNE_FIRM / "accounts.json", JUNE_FIRM / "portfolios.json")
     trades = {t["trade_id"]: t for t in connector.canonical["trades"]}
     parties = parties_by_portfolio(connector.canonical)
     domiciles = domiciles_by_ticker(connector.canonical)

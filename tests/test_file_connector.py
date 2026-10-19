@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from liquet.door.firm.firm_connector import FirmFileConnector
+from liquet.door.firm.firm_connector import JsonFirmConnector
 
 JUNE_FIRM = Path(__file__).parent / "fixtures" / "2026-06" / "firm"
 ACCOUNT = "ACC-KRW-CASH-01"
@@ -17,7 +17,7 @@ JUNE = (date(2026, 6, 1), date(2026, 6, 30))
 
 @pytest.fixture(scope="module")
 def connector():
-    return FirmFileConnector(JUNE_FIRM / "accounts.json", JUNE_FIRM / "portfolios.json")
+    return JsonFirmConnector(JUNE_FIRM / "accounts.json", JUNE_FIRM / "portfolios.json")
 
 
 def _ids(entries):
@@ -96,7 +96,7 @@ def test_only_the_asked_account_is_returned(tmp_path):
     (tmp_path / "accounts.json").write_text(
         json.dumps([account("A1", "M-A1"), account("A2", "M-A2")]), encoding="utf-8")
     (tmp_path / "portfolios.json").write_text("[]", encoding="utf-8")
-    connector = FirmFileConnector(tmp_path / "accounts.json", tmp_path / "portfolios.json")
+    connector = JsonFirmConnector(tmp_path / "accounts.json", tmp_path / "portfolios.json")
     assert _ids(connector.get_cash_entries("A1", *JUNE)) == ["M-A1"]
     assert _ids(connector.get_cash_entries("A2", *JUNE)) == ["M-A2"]
 

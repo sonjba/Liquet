@@ -26,7 +26,7 @@ from pathlib import Path
 from liquet.matching.bank_prepare import bank_items
 from liquet.door.bank.bank_reader import read_statement
 from liquet.canonical.firm_checks import check_canonical
-from liquet.door.firm.firm_connector import FirmFileConnector
+from liquet.door.firm.firm_connector import JsonFirmConnector
 from liquet.matching.firm_prepare import firm_items
 from liquet.matching.match import match
 from liquet.matching.match_checks import check_match_result
@@ -43,7 +43,7 @@ def ingest(sources: dict[str, Path]) -> dict:
     """Read the bank's and the firm's files and return them in Liquet's format,
     checked. Each side's reader runs its own checks and stops on a problem."""
     header, lines = read_statement(sources["header"], sources["lines"])
-    firm = FirmFileConnector(sources["accounts"], sources["portfolios"])
+    firm = JsonFirmConnector(sources["accounts"], sources["portfolios"])
     check_canonical(firm.canonical, header["period_start"])
     entries = firm.get_cash_entries(header["account_id"],
                                     header["period_start"], header["period_end"])

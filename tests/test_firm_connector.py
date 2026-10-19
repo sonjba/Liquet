@@ -111,7 +111,7 @@ def test_invalid_json_raises_value_error(tmp_path):
 
 @pytest.fixture(scope="module")
 def june_output(june_accounts, june_portfolios):
-    return firm_connector.to_canonical(june_accounts, june_portfolios)
+    return firm_connector.map_firm_records_to_canonical(june_accounts, june_portfolios)
 
 
 @pytest.fixture(scope="module")
@@ -135,7 +135,7 @@ def test_june_output_matches_expected(collection, june_output, expected_output):
 
 
 def test_empty_input_gives_empty_collections():
-    assert firm_connector.to_canonical([], []) == {c: [] for c in COLLECTIONS}
+    assert firm_connector.map_firm_records_to_canonical([], []) == {c: [] for c in COLLECTIONS}
 
 
 # ---------------- accounts ----------------
