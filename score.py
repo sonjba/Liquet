@@ -3,8 +3,8 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-from decide import load_reviews
-from propose import load_proposals
+from liquet.review.decide import load_reviews
+from liquet.review.propose import load_proposals
 from liquet.store.run_store import load_run
 
 

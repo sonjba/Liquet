@@ -7,12 +7,12 @@ from pathlib import Path
 import json
 import pytest
 
-from close_month import what_to_carry, close_month
+from liquet.review.close_month import what_to_carry, close_month
 
-from decide import record
-from investigate import ReplayClaude, investigate
+from liquet.review.decide import record
+from liquet.review.investigate import ReplayClaude, investigate
 from run_month import main as run_month
-from work_list import open_items
+from liquet.review.work_list import open_items
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",

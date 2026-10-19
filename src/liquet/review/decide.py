@@ -37,7 +37,7 @@ def load_reviews(run_folder: Path) -> list[dict]:
 def record(run_folder: Path, kind: str, finding_id: str, by: str, at: datetime,
            reason_code: str, reason: str = "") -> dict:
     """Check one decision, then add it to the end of reviews.jsonl."""
-    from propose import load_proposals  # imported here: propose.py imports this module
+    from liquet.review.propose import load_proposals  # imported here: propose.py imports this module
     findings = {f["finding_id"] for f in load_run(run_folder)["findings"]}
     findings |= {p["proposal_id"] for p in load_proposals(run_folder)}
     decided = {r["finding_id"] for r in load_reviews(run_folder)}

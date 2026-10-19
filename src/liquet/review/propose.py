@@ -20,8 +20,8 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from decide import load_reviews
-from work_list import open_items
+from liquet.review.decide import load_reviews
+from liquet.review.work_list import open_items
 
 PROPOSALS = "proposals.jsonl"
 PROPOSERS = ("agent", "person")

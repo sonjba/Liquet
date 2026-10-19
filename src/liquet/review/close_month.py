@@ -18,11 +18,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from decide import load_reviews
-from propose import load_proposals
+from liquet.review.decide import load_reviews
+from liquet.review.propose import load_proposals
 from liquet.store.run_store import load_run,load_liquet_format
-from work_list import open_items
-from facts import load_run_data
+from liquet.review.work_list import open_items
+from liquet.review.facts import load_run_data
 
 CLOSING = "closing.json"
 

@@ -67,20 +67,23 @@ def main(runs, live=False):
 
     print("\n3. Claude investigates what the rules left open")
     if live:
-        command("investigate.py", run)
+        command("-m", "liquet.review.investigate", run)
     else:
-        command("investigate.py", run, "--replay", ANSWERS)
+        command("-m", "liquet.review.investigate", run, "--replay", ANSWERS)
 
     print("\n4. The graph with Claude's proposals")
     snapshots["proposed"] = folder_after("Snapshot saved to",
                                          command("build_graph.py", run, "--snapshot"))
     if live:
-        print(f"\nClaude has answered. Now you decide, with decide.py {run} ...")
+        print(
+            f"\nClaude has answered. Now you decide, with: "
+            f"python -m liquet.review.decide {run} ..."
+        )
         return {"run": run, "snapshots": snapshots}
 
     print("\n5. A person decides (demo)")
     for action, finding, *reason in DECISIONS:
-        if "Saved:" not in command("decide.py", run, action, finding,
+        if "Saved:" not in command("-m", "liquet.review.decide", run, action, finding,
                                    "--by", "sonja", "--code", "CONFIRMED", *reason):
             raise SystemExit("Stopped: a decision was not saved.")
 

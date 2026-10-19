@@ -219,7 +219,7 @@ def test_each_finding_points_to_the_rule_that_proposed_it(g):
 @pytest.fixture(scope="module")
 def reviewed(june_run, tmp_path_factory):
     """A copy of the June run where sonja approved R5 and rejected R2a, an hour apart."""
-    from decide import record
+    from liquet.review.decide import record
     folder = tmp_path_factory.mktemp("reviewed") / "run-001"
     shutil.copytree(june_run, folder)
     record(folder, "APPROVED", "R5:CE-2026-06-0011", "sonja", REVIEW_AT, "CONFIRMED")
@@ -262,8 +262,8 @@ def test_a_review_snapshot_is_saved_next_to_the_rules_one(g, reviewed, tmp_path)
 
 
 def test_a_proposal_is_a_finding_with_its_proposer(june_run, tmp_path):
-    from decide import record
-    from propose import record_proposal
+    from liquet.review.decide import record
+    from liquet.review.propose import record_proposal
     folder = tmp_path / "run-001"
     shutil.copytree(june_run, folder)
     l12 = "ACC-KRW-CASH-01:2026-06:L12"
@@ -283,7 +283,7 @@ def test_a_proposal_is_a_finding_with_its_proposer(june_run, tmp_path):
 
 
 def test_an_investigation_records_what_claude_was_asked_and_what_it_led_to(june_run, tmp_path):
-    from propose import record_proposal
+    from liquet.review.propose import record_proposal
     from liquet.store.run_store import load_run
     folder = tmp_path / "run-001"
     shutil.copytree(june_run, folder)

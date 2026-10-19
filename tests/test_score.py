@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from propose import record_proposal
+from liquet.review.propose import record_proposal
 from run_month import main as run_month
 from score import score
 
@@ -53,6 +53,6 @@ def test_a_wrong_type_scores_wrong(run):
     assert verdicts(run)["B5"] == "WRONG"
 
 def test_a_rejected_rule_finding_no_longer_counts(run):
-    from decide import record
+    from liquet.review.decide import record
     record(run, "REJECTED", "R2a:CE-2026-06-0004", "sonja", AT, "NEEDS_EVIDENCE", "check the rate")
     assert verdicts(run)["B3"] == "OPEN"

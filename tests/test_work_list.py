@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from run_month import main as run_month
-from work_list import open_items
+from liquet.review.work_list import open_items
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from liquet.matching.firm_prepare import firm_items
 from liquet.store.run_store import load_liquet_format, load_run
-from work_list import open_items
+from liquet.review.work_list import open_items
 
 
 def load_run_data(run_folder):

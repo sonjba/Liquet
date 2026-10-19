@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from decide import load_reviews, record
+from liquet.review.decide import load_reviews, record
 from run_month import main as run_month
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

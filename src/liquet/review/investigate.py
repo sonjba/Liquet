@@ -18,10 +18,10 @@ from types import SimpleNamespace
 import anthropic
 from dotenv import load_dotenv
 
-from decide import load_reviews
-from facts import facts_for
-from propose import load_proposals, record_proposal
-from work_list import open_items
+from liquet.review.decide import load_reviews
+from liquet.review.facts import facts_for
+from liquet.review.propose import load_proposals, record_proposal
+from liquet.review.work_list import open_items
 
 MODEL = "claude-sonnet-5-5"
 

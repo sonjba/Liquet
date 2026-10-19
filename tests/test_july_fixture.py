@@ -7,7 +7,7 @@ from pathlib import Path
 
 from liquet.door.bank.bank_reader import check_continuity, read_header, read_statement
 from run_month import main as run_month
-from work_list import open_items
+from liquet.review.work_list import open_items
 
 FIXTURES = Path(__file__).parent / "fixtures"
 JUNE, JULY = FIXTURES / "2026-06", FIXTURES / "2026-07"
