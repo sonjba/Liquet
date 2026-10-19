@@ -30,7 +30,7 @@ from firm_connector import FirmFileConnector
 from firm_prepare import firm_items
 from match import match
 from match_checks import check_match_result
-from run_store import (fingerprints, load_liquet_format, new_run_folder, save_liquet_format,
+from liquet.store.run_store import (fingerprints, load_liquet_format, new_run_folder, save_liquet_format,
                        save_received, save_results)
 from carry import carried_items, previous_closing, save_brought_forward
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from run_month import ingest
-from run_store import (InputsChangedError, fingerprints, load_liquet_format, load_run,
+from liquet.store.run_store import (InputsChangedError, fingerprints, load_liquet_format, load_run,
                        new_run_folder, next_run_folder, run_folder_name, save_liquet_format,
                        save_received, save_results)
 

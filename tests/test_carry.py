@@ -12,7 +12,7 @@ from close_month import close_month
 from decide import record
 from investigate import ReplayClaude, investigate
 from run_month import main as run_month
-from run_store import load_run
+from liquet.store.run_store import load_run
 from work_list import open_items
 
 FIXTURES = Path(__file__).parent / "fixtures"

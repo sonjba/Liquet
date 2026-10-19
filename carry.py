@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from run_store import run_folder_name
+from liquet.store.run_store import run_folder_name
 
 BROUGHT_FORWARD = "brought_forward.json"
 

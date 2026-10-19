@@ -16,7 +16,7 @@ import argparse
 from decimal import Decimal
 from pathlib import Path
 
-from run_store import load_run
+from liquet.store.run_store import load_run
 
 
 def open_items(run_folder: Path) -> list[dict]:

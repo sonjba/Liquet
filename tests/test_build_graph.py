@@ -272,7 +272,7 @@ def test_a_proposal_is_a_finding_with_its_proposer(june_run, tmp_path):
                     model="claude-sonnet-5-5")
     record(folder, "APPROVED", "P1", "sonja", REVIEW_AT + timedelta(hours=1), "CONFIRMED")
     g = build_graph(folder)
-    from run_store import load_run
+    from liquet.store.run_store import load_run
     node = finding_node_id(load_run(folder)["run"]["run_id"], "P1")
     assert g.node(node).node_type == "Finding"
     assert g.node(node).properties.get("model") == "claude-sonnet-5-5"
@@ -284,7 +284,7 @@ def test_a_proposal_is_a_finding_with_its_proposer(june_run, tmp_path):
 
 def test_an_investigation_records_what_claude_was_asked_and_what_it_led_to(june_run, tmp_path):
     from propose import record_proposal
-    from run_store import load_run
+    from liquet.store.run_store import load_run
     folder = tmp_path / "run-001"
     shutil.copytree(june_run, folder)
     l12, ce8 = "ACC-KRW-CASH-01:2026-06:L12", "CE-2026-06-0008"

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from decide import load_reviews
 from propose import load_proposals
-from run_store import load_run
+from liquet.store.run_store import load_run
 
 
 def explanations(run):

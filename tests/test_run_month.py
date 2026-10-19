@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 import run_month
-from run_store import load_liquet_format, load_run
+from liquet.store.run_store import load_liquet_format, load_run
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)

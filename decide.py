@@ -18,7 +18,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from run_store import load_run
+from liquet.store.run_store import load_run
 
 REVIEWS = "reviews.jsonl"
 REASON_CODES = ("CONFIRMED", "WRONG_AMOUNT", "WRONG_PERIOD", "WRONG_PARTY",

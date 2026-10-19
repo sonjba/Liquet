@@ -20,17 +20,27 @@ AFTER_THE_DOOR = ["bank_prepare", "firm_prepare", "firm_checks", "match", "match
                   "run_store","investigate", "build_graph", "show_graph"]
 
 
+def _file(module: str) -> Path | None:
+    """Where a Liquet module lives: in the project folder, or, once moved, in src/liquet/."""
+    places = [ROOT / f"{module}.py", *(ROOT / "src" / "liquet").rglob(f"{module}.py")]
+    return next((place for place in places if place.exists()), None)
+
+
+def _short_name(imported: str) -> str:
+    """liquet.store.run_store -> run_store; run_store -> run_store."""
+    return imported.split(".")[-1] if imported.startswith("liquet.") else imported.split(".")[0]
+
+
 def _local_imports(module: str) -> set[str]:
     """The Liquet modules this module imports directly."""
-    tree = ast.parse((ROOT / f"{module}.py").read_text(encoding="utf-8"))
+    tree = ast.parse(_file(module).read_text(encoding="utf-8"))
     names = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            names |= {alias.name.split(".")[0] for alias in node.names}
+            names |= {_short_name(alias.name) for alias in node.names}
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            names.add(node.module.split(".")[0])
-    return {name for name in names if (ROOT / f"{name}.py").exists()}
-
+            names.add(_short_name(node.module))
+    return {name for name in names if _file(name) is not None}
 
 def _all_imports(module: str) -> set[str]:
     """Everything the module imports from Liquet, directly or through others."""

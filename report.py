@@ -13,7 +13,7 @@ from pathlib import Path
 from bank_prepare import bank_items
 from firm_prepare import firm_items
 from run_month import show
-from run_store import load_liquet_format, load_run
+from liquet.store.run_store import load_liquet_format, load_run
 
 
 def load_month(run_folder: Path) -> dict:
