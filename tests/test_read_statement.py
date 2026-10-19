@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 import pytest
-import bank_reader
+from liquet.door.bank import bank_reader
 import re
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from bank_reader import check_continuity, read_header
+from liquet.door.bank.bank_reader import check_continuity, read_header
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 

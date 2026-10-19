@@ -15,8 +15,8 @@ import json
 from datetime import date
 from pathlib import Path
 
-from firm_mapping import FIRM_DIRECTION_CODES, FIRM_MAPPING, FIRM_RECORD_IDS
-from path_mapper import check_mapping, extract
+from liquet.door.firm.firm_mapping import FIRM_DIRECTION_CODES, FIRM_MAPPING, FIRM_RECORD_IDS
+from liquet.door.path_mapper import check_mapping, extract
 
 # A mistake in firm_mapping.py stops everything here, before any data is read.
 check_mapping(FIRM_MAPPING, FIRM_RECORD_IDS)

@@ -9,7 +9,7 @@ from datetime import date
 
 import pytest
 
-import firm_connector
+from liquet.door.firm import firm_connector
 from firm_checks import (
     CanonicalCheckError, check_canonical, check_cash_entries, check_ids_are_unique,
     check_money_is_text, check_opening_balance_exists, check_references_exist,

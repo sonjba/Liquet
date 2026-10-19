@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from bank_reader import bank_entry_type, read_statement
+from liquet.door.bank.bank_reader import bank_entry_type, read_statement
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 

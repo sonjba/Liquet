@@ -7,7 +7,7 @@ tested in test_firm_connector.py.
 
 import pytest
 
-from path_mapper import UNKNOWN, Step, check_mapping, extract, parse_path
+from liquet.door.path_mapper import UNKNOWN, Step, check_mapping, extract, parse_path
 
 IDS = {"shops": "shop_id"}   # one dataset, "shops"; each shop is named by its shop_id
 

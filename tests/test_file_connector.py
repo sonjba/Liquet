@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from firm_connector import FirmFileConnector
+from liquet.door.firm.firm_connector import FirmFileConnector
 
 JUNE_FIRM = Path(__file__).parent / "fixtures" / "2026-06" / "firm"
 ACCOUNT = "ACC-KRW-CASH-01"

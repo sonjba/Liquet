@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from bank_prepare import bank_to_item
-from bank_reader import read_statement
-from firm_connector import FirmFileConnector
+from liquet.door.bank.bank_reader import read_statement
+from liquet.door.firm.firm_connector import FirmFileConnector
 from firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
 from match import match
 

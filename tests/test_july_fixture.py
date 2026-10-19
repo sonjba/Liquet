@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from bank_reader import check_continuity, read_header, read_statement
+from liquet.door.bank.bank_reader import check_continuity, read_header, read_statement
 from run_month import main as run_month
 from work_list import open_items
 

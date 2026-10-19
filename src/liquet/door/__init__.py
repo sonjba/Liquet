@@ -1,0 +1,1 @@
+"""The door: the only code that knows outside formats. It turns them into Liquet's format, once."""

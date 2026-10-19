@@ -30,7 +30,7 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from bank_mapping import BANK_DESCRIPTION_TYPES, COLUMNS, HEADER_FIELDS
+from liquet.door.bank.bank_mapping import BANK_DESCRIPTION_TYPES, COLUMNS, HEADER_FIELDS
 
 def parse_money(text: str, where: str, allow_negative: bool = False) -> Decimal | None:
     text = text.strip()

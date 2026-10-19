@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-import firm_connector
-from firm_mapping import FIRM_MAPPING, FIRM_RECORD_IDS
-from path_mapper import check_mapping
+from liquet.door.firm import firm_connector
+from liquet.door.firm.firm_mapping import FIRM_MAPPING, FIRM_RECORD_IDS
+from liquet.door.path_mapper import check_mapping
 
 EXPECTED = Path(__file__).parent / "fixtures" / "2026-06" / "expected" / "firm_canonical.json"
 

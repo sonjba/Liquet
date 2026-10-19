@@ -24,9 +24,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from bank_prepare import bank_items
-from bank_reader import read_statement
+from liquet.door.bank.bank_reader import read_statement
 from firm_checks import check_canonical
-from firm_connector import FirmFileConnector
+from liquet.door.firm.firm_connector import FirmFileConnector
 from firm_prepare import firm_items
 from match import match
 from match_checks import check_match_result
