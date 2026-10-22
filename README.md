@@ -6,6 +6,8 @@
 
 Built in Python, with a temporal graph in [Raphtory](https://github.com/Pometry/Raphtory).
 
+![How Liquet works: the door, the run folder, rules R0–R5, investigation with Claude, a person's decision, closing the month, and the temporal graph that records it all](docs/images/liquet-overview.png)
+
 ---
 
 ## Project Description
