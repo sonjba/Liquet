@@ -1,8 +1,9 @@
 """Ask Claude about the open items the rules left: tier 1, one call per item.
 
-    python investigate.py RUN                    every open item not already proposed
-    python investigate.py RUN ITEM_ID            one item
-    python investigate.py RUN --replay FILE      reuse answers Claude gave before (free)
+    python -m liquet.review.investigate RUN                    every open item not already proposed
+    python -m liquet.review.investigate RUN ITEM_ID            one item
+    python -m liquet.review.investigate RUN --replay FILE      reuse answers Claude gave before (free)
+    python -m liquet.review.investigate RUN --model NAME       ask another model (default: LIQUET_MODEL)
 
 Code gathers the facts (facts.py), Claude answers in a fixed form, propose.py checks
 the answer before it is saved as a proposal for a person to decide. Every call,
@@ -16,14 +17,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import anthropic
-from dotenv import load_dotenv
+
+from liquet.config import DEFAULT_MODEL, load_settings
+from liquet.review.decide import load_reviews
 
 from liquet.review.decide import load_reviews
 from liquet.review.facts import facts_for
 from liquet.review.propose import load_proposals, record_proposal
 from liquet.review.work_list import open_items
 
-MODEL = "claude-sonnet-5-5"
 
 job = """You are Quaestor, the investigator in Liquet, a monthly bank reconciliation.
 Use only the facts you are given. If they are not enough, say so.
@@ -88,7 +90,7 @@ class ReplayClaude:
         raise ValueError("the replay file has no answer for this question's open item")
 
 
-def investigate(client, run, item_id, source="claude"):
+def investigate(client, run, item_id, source="claude", model=DEFAULT_MODEL):
     """One call to Claude about one open item; the answer checked, saved and logged.
     `source` says where the answer came from: "claude", or "replay:<file>"."""
     facts = facts_for(run, item_id)
@@ -97,7 +99,7 @@ def investigate(client, run, item_id, source="claude"):
                 "\n\nPropose an explanation, or answer NON_LIQUET if the facts are not enough.")
 
     response = client.messages.create(
-        model=MODEL,
+        model=model,
         max_tokens=1024,
         system=job,
         messages=[{"role": "user", "content": question}],
@@ -116,7 +118,7 @@ def investigate(client, run, item_id, source="claude"):
                 answer["adjustment"], answer["explanation"],
                 by="quaestor", proposer="agent", at=datetime.now(timezone.utc),
                 evidence=facts,
-                model=MODEL)
+                model=model)
             proposal_id = proposal["proposal_id"]
             outcome = f"saved as {proposal_id}"
         except ValueError as error:
@@ -126,7 +128,7 @@ def investigate(client, run, item_id, source="claude"):
 
     investigation = {"at": datetime.now(timezone.utc).isoformat(), "item_id": item_id,
                      "by": "quaestor", "examined": examined, "source": source,
-                     "model": MODEL, "job": job, "question": question,
+                     "model": model, "job": job, "question": question,
                      "answer": answer, "outcome": outcome, "proposal_id": proposal_id,
                      "input_tokens": response.usage.input_tokens,
                      "output_tokens": response.usage.output_tokens,
@@ -142,13 +144,16 @@ if __name__ == "__main__":
     parser.add_argument("item_id", nargs="?", help="one item; leave out for all open items")
     parser.add_argument("--replay", type=Path,
                         help="reuse answers from an investigations.jsonl instead of calling Claude")
+    parser.add_argument("--model", help="the Claude model to ask (default: LIQUET_MODEL, else "
+                                        f"{DEFAULT_MODEL})")
     args = parser.parse_args()
     run = args.run_folder
+    settings = load_settings()                     # also loads .env, for the API key
+    model = args.model or settings.model
 
     if args.replay:
         client, source = ReplayClaude(args.replay), f"replay:{args.replay.name}"
     else:
-        load_dotenv()
         client, source = anthropic.Anthropic(), "claude"
 
     if args.item_id:
@@ -159,7 +164,7 @@ if __name__ == "__main__":
         print(f"{len(item_ids)} open items to investigate ({len(skip)} already proposed)")
 
     for item_id in item_ids:
-        investigation = investigate(client, run, item_id, source)
+        investigation = investigate(client, run, item_id, source, model=model)
         print(f"{item_id}: {investigation['outcome']}")
         print(f"  {investigation['answer']['explanation']}")
         print(f"  tokens in {investigation['input_tokens']}, out {investigation['output_tokens']}")

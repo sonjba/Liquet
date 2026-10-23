@@ -22,7 +22,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
-
+from liquet.config import load_settings
 from liquet.matching.bank_prepare import bank_items
 from liquet.door.bank.bank_reader import read_statement
 from liquet.canonical.canonical_checks import validate_canonical_firm_data
@@ -144,10 +144,11 @@ if __name__ == "__main__":
     parser.add_argument("--lines", type=Path, required=True, help="bank statement lines (CSV)")
     parser.add_argument("--accounts", type=Path, required=True, help="firm accounts (JSON)")
     parser.add_argument("--portfolios", type=Path, required=True, help="firm portfolios (JSON)")
-    parser.add_argument("--runs", type=Path, default=Path("runs"),
-                        help="folder that holds every run (default: runs)")
+    parser.add_argument("--runs", type=Path,
+                        help="folder that holds every run (default: LIQUET_RUNS_DIR, else runs)")
     args = parser.parse_args()
+    runs = args.runs or load_settings().runs_dir
 
     sources = {"header": args.header, "lines": args.lines,
                "accounts": args.accounts, "portfolios": args.portfolios}
-    show(main(sources, args.runs, run_at=datetime.now(timezone.utc)))
+    show(main(sources, runs, run_at=datetime.now(timezone.utc)))

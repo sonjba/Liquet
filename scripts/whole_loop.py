@@ -20,6 +20,7 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
+from liquet.config import load_settings
 
 PROJECT = Path(__file__).parent.parent   # the project folder: scripts/ is one level down
 JUNE = Path("tests") / "fixtures" / "2026-06"   # the commands run from the project folder
@@ -98,7 +99,7 @@ def main(runs, live=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run, investigate, review and score June.")
-    parser.add_argument("--runs", type=Path, default=Path("runs"), help="where runs are saved")
+    parser.add_argument("--runs", type=Path, help="where runs are saved (default: LIQUET_RUNS_DIR, else runs)")
     parser.add_argument("--live", action="store_true", help="really ask Claude (costs credits)")
     args = parser.parse_args()
-    main(args.runs, args.live)
+    main(args.runs or load_settings().runs_dir, args.live)
