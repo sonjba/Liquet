@@ -4,6 +4,9 @@ Each folder under src/liquet/ is a part. A part may import from itself and from 
 parts listed for it in ALLOWED, nothing else. The rules are about folders, not file
 names, so they keep working when a file is renamed or a new file is added.
 
+Files directly in src/liquet/ (config.py) are shared: every part may use them,
+and they may use no part.
+
 Two rules matter most:
 - the door: only the pipeline reads outside formats. Everything after it sees
   Liquet's own format.
@@ -28,6 +31,11 @@ ALLOWED = {
     "pipeline":   {"door", "canonical", "matching", "store"},  # runs a month: the only door user
     "evaluation": {"review", "store"},                       # the score: nobody imports it
 }
+
+
+def shared():
+    """The modules directly in src/liquet/, which every part may use: config."""
+    return {f.stem for f in LIQUET.glob("*.py") if f.stem != "__init__"}
 
 
 def parts():
@@ -60,10 +68,15 @@ def test_every_part_has_a_rule():
 def test_a_part_imports_only_what_it_may(part):
     broken = {}
     for file in sorted((LIQUET / part).rglob("*.py")):
-        extra = liquet_imports(file.read_text(encoding="utf-8")) - {part} - ALLOWED[part]
+        extra = liquet_imports(file.read_text(encoding="utf-8")) - {part} - ALLOWED[part] - shared()
         if extra:
             broken[str(file.relative_to(LIQUET))] = sorted(extra)
     assert broken == {}
+
+
+@pytest.mark.parametrize("module", sorted(shared()))
+def test_a_shared_module_uses_no_part(module):
+    assert liquet_imports((LIQUET / f"{module}.py").read_text(encoding="utf-8")) == set()
 
 
 def test_only_the_pipeline_may_use_the_door():
