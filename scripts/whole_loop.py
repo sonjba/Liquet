@@ -1,15 +1,15 @@
 """The whole June loop, one command after another, exactly as a person would type them.
 
-    python whole_loop.py            Claude's answers replayed from a real earlier run (free)
-    python whole_loop.py --live     Claude really asked; stops before the person decides
+        python scripts/whole_loop.py            Claude's answers replayed from a real earlier run (free)
+    python scripts/whole_loop.py --live     Claude really asked; stops before the person decides
 
-    1. run the month                      run_month.py
-    2. the graph after the rules          build_graph.py --snapshot      (..._rules)
-    3. Claude investigates what is open   investigate.py
-    4. the graph with the proposals       build_graph.py --snapshot      (..._proposed)
-    5. a person decides (demo)            decide.py, once per decision
-    6. the graph after review             build_graph.py --snapshot      (..._review)
-    7. the score against the answer key   score.py
+    1. run the month                      python -m liquet.pipeline.run_month
+    2. the graph after the rules          python -m liquet.graph.build_graph --snapshot   (..._rules)
+    3. Claude investigates what is open   python -m liquet.review.investigate
+    4. the graph with the proposals       python -m liquet.graph.build_graph --snapshot   (..._proposed)
+    5. a person decides (demo)            python -m liquet.review.decide, once per decision
+    6. the graph after review             python -m liquet.graph.build_graph --snapshot   (..._review)
+    7. the score against the answer key   python -m liquet.evaluation.score
 
 The decisions in step 5 are a DEMO, written for the replayed answers: in real use a
 person reads each proposal and decides. With --live, Claude may answer differently,
@@ -21,7 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROJECT = Path(__file__).parent
+PROJECT = Path(__file__).parent.parent   # the project folder: scripts/ is one level down
 JUNE = Path("tests") / "fixtures" / "2026-06"   # the commands run from the project folder
 ANSWERS = JUNE / "claude_answers.jsonl"         # Claude's real answers from an earlier run
 
@@ -92,7 +92,7 @@ def main(runs, live=False):
                                        command("-m", "liquet.graph.build_graph", run, "--snapshot"))
 
     print("\n7. The score against the answer key")
-    score = command("score.py", run, JUNE / "answer_key.json")
+    score = command("-m", "liquet.evaluation.score", run, JUNE / "answer_key.json")
     return {"run": run, "snapshots": snapshots, "score": score.strip().splitlines()[-1]}
 
 

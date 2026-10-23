@@ -333,7 +333,7 @@ python -m venv .venv
 pip install -r requirements.txt
 
 pytest -q
-python whole_loop.py
+python scripts/whole_loop.py
 ```
 
 `whole_loop.py` runs June from start to finish, through the same commands a person types:
@@ -342,7 +342,7 @@ and the score. By default it replays Claude's real answers from an earlier run, 
 no API key and costs nothing.
 
 To ask Claude for real, put your key in a `.env` file (see `.env.example`; `.env` is never
-committed) and run `python whole_loop.py --live`. It stops before the decisions, because a
+committed) and run `python scripts/whole_loop.py --live`. It stops before the decisions, because a
 person makes those.
 
 ---

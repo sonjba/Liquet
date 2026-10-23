@@ -9,7 +9,7 @@ import pytest
 
 from liquet.review.propose import record_proposal
 from liquet.pipeline.run_month import main as run_month
-from score import score
+from liquet.evaluation.score import score
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",

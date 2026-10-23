@@ -22,5 +22,5 @@ dev = ["pytest==9.1.1"]
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]      # the modules still in the project folder; removed once all have moved
+pythonpath = ["scripts"]   # only so tests can import scripts/whole_loop.py; scripts are not part of the package
 testpaths = ["tests"]
