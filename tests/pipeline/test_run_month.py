@@ -10,7 +10,7 @@ import pytest
 import liquet.pipeline.run_month as run_month
 from liquet.store.run_store import load_liquet_format, load_run
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)
 SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",
            "accounts": JUNE / "firm" / "accounts.json",

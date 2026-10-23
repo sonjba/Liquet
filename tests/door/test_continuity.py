@@ -6,7 +6,7 @@ import pytest
 
 from liquet.door.bank.bank_reader import check_continuity, read_header
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 
 
 @pytest.fixture(scope="module")

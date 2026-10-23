@@ -10,7 +10,7 @@ from liquet.matching.match import match
 from liquet.matching.match_checks import (MatchCheckError, check_every_item_accounted_for,
                           check_match_result, check_one_congruit_per_firm_item)
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 
 
 @pytest.fixture(scope="module")

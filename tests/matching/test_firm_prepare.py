@@ -8,7 +8,7 @@ from liquet.door.firm.firm_connector import JsonFirmConnector
 from liquet.matching.firm_prepare import (domiciles_by_ticker, expected_date, firm_to_item,
                           parties_by_portfolio, signed_amount)
 
-JUNE_FIRM = Path(__file__).parent / "fixtures" / "2026-06" / "firm"
+JUNE_FIRM = Path(__file__).parent.parent / "fixtures" / "2026-06" / "firm"
 ITEM_KEYS = {"id", "side", "date", "expected_date", "amount",
              "reference", "entry_type", "description", "party", "domicile"}
 

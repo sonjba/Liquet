@@ -15,7 +15,7 @@ from liquet.pipeline.run_month import main as run_month
 from liquet.store.run_store import load_run
 from liquet.review.work_list import open_items
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 def files(month):

@@ -9,7 +9,7 @@ from liquet.door.bank.bank_reader import check_continuity, read_header, read_sta
 from liquet.pipeline.run_month import main as run_month
 from liquet.review.work_list import open_items
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 JUNE, JULY = FIXTURES / "2026-06", FIXTURES / "2026-07"
 JULY_FILES = {"header": JULY / "statement_header.json", "lines": JULY / "bank_statement.csv",
               "accounts": JULY / "firm" / "accounts.json",

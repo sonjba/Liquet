@@ -9,7 +9,7 @@ from liquet.graph.build_graph import build_graph, save_snapshot
 from liquet.pipeline.run_month import main as run_month
 from liquet.graph.show_graph import short_label, write_graph_page
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",
            "accounts": JUNE / "firm" / "accounts.json",
            "portfolios": JUNE / "firm" / "portfolios.json"}

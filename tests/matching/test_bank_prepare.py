@@ -7,7 +7,7 @@ import pytest
 from liquet.door.bank import bank_reader
 from liquet.matching.bank_prepare import bank_items, bank_to_item
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 ITEM_KEYS = {"id", "side", "date", "expected_date", "amount",
              "reference", "entry_type", "description", "party", "domicile"}
 

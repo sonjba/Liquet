@@ -10,7 +10,7 @@ from liquet.door.firm.firm_connector import JsonFirmConnector
 from liquet.matching.firm_prepare import domiciles_by_ticker, firm_to_item, parties_by_portfolio
 from liquet.matching.match import match
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 JUNE_END = date(2026, 6, 30)
 
 

@@ -18,7 +18,7 @@ from liquet.door.firm import firm_connector
 from liquet.door.firm.firm_mapping import FIRM_MAPPING, FIRM_RECORD_IDS
 from liquet.door.path_mapper import check_mapping
 
-EXPECTED = Path(__file__).parent / "fixtures" / "2026-06" / "expected" / "firm_canonical.json"
+EXPECTED = Path(__file__).parent.parent / "fixtures" / "2026-06" / "expected" / "firm_canonical.json"
 
 COLLECTIONS = ["accounts", "account_balances", "clients", "portfolios",
                "securities", "trades", "cash_book"]

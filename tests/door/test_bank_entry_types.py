@@ -7,7 +7,7 @@ import pytest
 
 from liquet.door.bank.bank_reader import bank_entry_type, read_statement
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 
 
 @pytest.mark.parametrize("description, expected", [

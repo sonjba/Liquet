@@ -9,7 +9,7 @@ import pytest
 import liquet.pipeline.run_month as run_month
 from liquet.graph.build_graph import build_graph, describe, finding_node_id, load_snapshot, save_snapshot
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)
 RUN_ID = "ACC-KRW-CASH-01_2026-06/run-001"
 

@@ -5,9 +5,9 @@ import pytest
 from liquet.door.bank import bank_reader
 import re
 
-JUNE = Path(__file__).parent / "fixtures" / "2026-06"
+JUNE = Path(__file__).parent.parent / "fixtures" / "2026-06"
 HEADER_ROW = "date,description,reference,paid_in,paid_out,balance\n"
-CASES = Path(__file__).parent / "fixtures" / "cases"
+CASES = Path(__file__).parent.parent / "fixtures" / "cases"
 
 # NORMAL CASES (assertions check that the data is read correctly) assert
 
