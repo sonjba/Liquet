@@ -10,8 +10,8 @@ from datetime import date
 import pytest
 
 from liquet.door.firm import firm_connector
-from liquet.canonical.firm_checks import (
-    CanonicalCheckError, check_canonical, check_cash_entries, check_ids_are_unique,
+from liquet.canonical.canonical_checks import (
+    CanonicalCheckError, validate_canonical_firm_data, check_cash_entries, check_ids_are_unique,
     check_money_is_text, check_opening_balance_exists, check_references_exist,
     check_settlements_match_trades, check_trades_add_up,
 )
@@ -42,14 +42,14 @@ def _problems(error) -> str:
 # ---------------- the June data passes ----------------
 
 def test_june_passes_every_check(june):
-    check_canonical(june, JUNE_START)   # raises if anything fails
+    validate_canonical_firm_data(june, JUNE_START)   # raises if anything fails
 
 
 def test_every_problem_is_listed_at_once(june):
     _find(june["trades"], "trade_id", "TR-26060101")["settlement_amount"] = "1.00"
     june["clients"].append(copy.deepcopy(june["clients"][0]))
     with pytest.raises(CanonicalCheckError) as error:
-        check_canonical(june, JUNE_START)
+        validate_canonical_firm_data(june, JUNE_START)
     checks = [p.split(",")[0] for p in error.value.problems]
     assert "check 1" in checks and "check 3" in checks and "check 5" in checks
 
@@ -57,7 +57,7 @@ def test_every_problem_is_listed_at_once(june):
 def test_missing_collection_raises(june):
     del june["trades"]
     with pytest.raises(CanonicalCheckError, match="missing collection.*trades"):
-        check_canonical(june, JUNE_START)
+        validate_canonical_firm_data(june, JUNE_START)
 
 
 # ---------------- check 1: ids are unique ----------------
@@ -198,7 +198,7 @@ def test_float_money_stops_before_the_arithmetic(june):
     # connector as a float. Here it stops the run, and checks 3 and 5 don't run on it.
     _find(june["trades"], "trade_id", "TR-26060101")["settlement_amount"] = 4852.4
     with pytest.raises(CanonicalCheckError) as error:
-        check_canonical(june, JUNE_START)
+        validate_canonical_firm_data(june, JUNE_START)
     assert error.value.problems == [
         "check 6, trades TR-26060101 (portfolios/PF-CL-001/cash_movements/1/trade): "
         "settlement_amount must be text with two decimals, got 4852.4"]
@@ -221,4 +221,4 @@ def test_opening_balance_is_the_day_before_the_period(june):
 def test_no_balances_at_all_is_reported(june):
     june["account_balances"] = []
     with pytest.raises(CanonicalCheckError, match="no opening balance as of 2026-05-31"):
-        check_canonical(june, JUNE_START)
+        validate_canonical_firm_data(june, JUNE_START)
