@@ -4,7 +4,7 @@ These checks look only at the canonical shape, never at the firm's own data,
 so any connector's output can be checked the same way.
 
 Each check returns a list of problems; an empty list means it passed.
-check_canonical() runs them all and stops the run if any problem is found,
+validate_canonical_firm_data() runs them all and stops the run if any problem is found,
 listing every problem at once so they can all be fixed together. Each
 problem names the check, the record and where the record came from (`source`).
 

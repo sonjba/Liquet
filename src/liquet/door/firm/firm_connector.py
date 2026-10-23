@@ -149,7 +149,7 @@ class JsonFirmConnector:
     know or care where the data came from. Tests use it, so they run
     without a database.
 
-    Liquet runs canonical_checks.check_canonical() on `canonical` before
+    Liquet runs canonical_checks.validate_canonical_firm_data() on `canonical` before
     asking for anything else.
     """
 
