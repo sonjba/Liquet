@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 import run_month
-from build_graph import build_graph, describe, finding_node_id, load_snapshot, save_snapshot
+from liquet.graph.build_graph import build_graph, describe, finding_node_id, load_snapshot, save_snapshot
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
 RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)
@@ -193,7 +193,7 @@ def test_snapshot_keeps_exact_money(g, tmp_path):
 
 def test_a_snapshot_that_loses_something_stops_the_save(g, tmp_path, monkeypatch):
     # Pretend the file format dropped data (as save_to_file drops Decimals).
-    import build_graph
+    import liquet.graph.build_graph as build_graph
     monkeypatch.setattr(build_graph, "load_snapshot", lambda folder: build_graph.Graph())
     with pytest.raises(ValueError, match="does not load back the same graph"):
         save_snapshot(g, tmp_path, "rules", RUN_AT)

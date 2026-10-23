@@ -1,7 +1,6 @@
 """Draw a saved graph snapshot as an interactive web page (open it in a browser).
 
-    python show_graph.py runs/ACC-KRW-CASH-01_2026-06/run-006/graph/2026-10-16T08-12-05_rules
-
+    python -m liquet.graph.show_graph runs/ACC-KRW-CASH-01_2026-06/run-006/graph/2026-10-16T08-12-05_rules
 Writes the page next to the snapshot, with the same name plus .html, so the
 "before" and "after" pictures sit side by side and neither replaces the other:
 
@@ -18,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from build_graph import load_snapshot
+from liquet.graph.build_graph import load_snapshot
 
 
 def short_label(node_id: str, node_type: str, properties: dict) -> str:

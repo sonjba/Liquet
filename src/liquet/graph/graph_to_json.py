@@ -1,6 +1,6 @@
 """A saved graph snapshot as a JSON file you can read.
 
-    python graph_to_json.py runs/.../graph/<time>_review
+    python -m liquet.graph.graph_to_json runs/.../graph/<time>_review
 
 Writes <snapshot>.json next to the snapshot folder. Never overwrites one.
 Nodes are grouped by type, edges by layer, so you can find
@@ -11,7 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
-from build_graph import load_snapshot
+from liquet.graph.build_graph import load_snapshot
 
 
 def graph_as_dict(graph) -> dict:

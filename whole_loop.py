@@ -63,7 +63,7 @@ def main(runs, live=False):
 
     print("\n2. The graph after the rules")
     snapshots = {"rules": folder_after("Snapshot saved to",
-                                       command("build_graph.py", run, "--snapshot"))}
+                                       command("-m", "liquet.graph.build_graph", run, "--snapshot"))}
 
     print("\n3. Claude investigates what the rules left open")
     if live:
@@ -73,7 +73,7 @@ def main(runs, live=False):
 
     print("\n4. The graph with Claude's proposals")
     snapshots["proposed"] = folder_after("Snapshot saved to",
-                                         command("build_graph.py", run, "--snapshot"))
+                                         command("-m", "liquet.graph.build_graph", run, "--snapshot"))
     if live:
         print(
             f"\nClaude has answered. Now you decide, with: "
@@ -89,7 +89,7 @@ def main(runs, live=False):
 
     print("\n6. The graph after review")
     snapshots["review"] = folder_after("Snapshot saved to",
-                                       command("build_graph.py", run, "--snapshot"))
+                                       command("-m", "liquet.graph.build_graph", run, "--snapshot"))
 
     print("\n7. The score against the answer key")
     score = command("score.py", run, JUNE / "answer_key.json")

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from build_graph import build_graph, save_snapshot
-from graph_to_json import write_graph_json
+from liquet.graph.build_graph import build_graph, save_snapshot
+from liquet.graph.graph_to_json import write_graph_json
 from run_month import main as run_month
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"
