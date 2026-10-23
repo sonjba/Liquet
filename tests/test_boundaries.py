@@ -1,10 +1,14 @@
-"""Only the door knows outside formats.
+"""Which parts of Liquet may use which: the rules, checked on the code itself.
 
-The door is the code that reads a bank's or a firm's own files and turns
-them into Liquet's format. Everything after it must work from Liquet's
-format alone, so a new bank or firm changes the door and nothing else.
-These tests read each module's imports (and their imports, and so on) and
-fail if a module after the door reaches into it.
+Each folder under src/liquet/ is a part. A part may import from itself and from the
+parts listed for it in ALLOWED, nothing else. The rules are about folders, not file
+names, so they keep working when a file is renamed or a new file is added.
+
+Two rules matter most:
+- the door: only the pipeline reads outside formats. Everything after it sees
+  Liquet's own format.
+- evaluation: nothing imports it. The score is the builder's check, and the agent
+  must never see the answer key.
 """
 
 import ast
@@ -12,51 +16,66 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).parent.parent
+LIQUET = Path(__file__).parent.parent / "src" / "liquet"
 
-DOOR = {"bank_reader", "bank_mapping", "firm_connector", "firm_mapping", "path_mapper"}
-
-AFTER_THE_DOOR = ["bank_prepare", "firm_prepare", "canonical_checks", "match", "match_checks", "carry",
-                  "run_store","investigate", "build_graph", "show_graph"]
-
-
-def _file(module: str) -> Path | None:
-    """Where a Liquet module lives: in the project folder, or, once moved, in src/liquet/."""
-    places = [ROOT / f"{module}.py", *(ROOT / "src" / "liquet").rglob(f"{module}.py")]
-    return next((place for place in places if place.exists()), None)
-
-
-def _short_name(imported: str) -> str:
-    """liquet.store.run_store -> run_store; run_store -> run_store."""
-    return imported.split(".")[-1] if imported.startswith("liquet.") else imported.split(".")[0]
+ALLOWED = {
+    "door":       set(),                                     # outside formats in, nothing else
+    "canonical":  set(),                                     # checks on Liquet's format
+    "store":      set(),                                     # the run folder
+    "matching":   set(),                                     # prepare and match, R0-R5
+    "review":     {"matching", "store"},                     # open items, Claude, decisions
+    "graph":      {"matching", "review", "store"},           # the temporal graph
+    "pipeline":   {"door", "canonical", "matching", "store"},  # runs a month: the only door user
+    "evaluation": {"review", "store"},                       # the score: nobody imports it
+}
 
 
-def _local_imports(module: str) -> set[str]:
-    """The Liquet modules this module imports directly."""
-    tree = ast.parse(_file(module).read_text(encoding="utf-8"))
-    names = set()
-    for node in ast.walk(tree):
+def parts():
+    """Every folder under src/liquet/ that holds code."""
+    return sorted(p.name for p in LIQUET.iterdir() if p.is_dir() and list(p.rglob("*.py")))
+
+
+def liquet_imports(source: str) -> set[str]:
+    """The parts of Liquet a piece of source imports: liquet.review.decide -> review."""
+    found = set()
+    for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
-            names |= {_short_name(alias.name) for alias in node.names}
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            names.add(_short_name(node.module))
-    return {name for name in names if _file(name) is not None}
-
-def _all_imports(module: str) -> set[str]:
-    """Everything the module imports from Liquet, directly or through others."""
-    seen, todo = set(), [module]
-    while todo:
-        for name in _local_imports(todo.pop()) - seen:
-            seen.add(name)
-            todo.append(name)
-    return seen
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            if node.level > 0:
+                raise ValueError("relative import: write it as liquet.<part>.<module>")
+            names = [node.module or ""]
+        else:
+            continue
+        found |= {name.split(".")[1] for name in names if name.startswith("liquet.")}
+    return found
 
 
-@pytest.mark.parametrize("module", AFTER_THE_DOOR)
-def test_nothing_after_the_door_imports_the_door(module):
-    assert _all_imports(module) & DOOR == set()
+def test_every_part_has_a_rule():
+    # A new folder must be given its rule here before it can be used.
+    assert set(parts()) == set(ALLOWED)
+
+
+@pytest.mark.parametrize("part", sorted(ALLOWED))
+def test_a_part_imports_only_what_it_may(part):
+    broken = {}
+    for file in sorted((LIQUET / part).rglob("*.py")):
+        extra = liquet_imports(file.read_text(encoding="utf-8")) - {part} - ALLOWED[part]
+        if extra:
+            broken[str(file.relative_to(LIQUET))] = sorted(extra)
+    assert broken == {}
+
+
+def test_only_the_pipeline_may_use_the_door():
+    assert [part for part, may in ALLOWED.items() if "door" in may] == ["pipeline"]
+
+
+def test_nothing_may_use_evaluation():
+    assert [part for part, may in ALLOWED.items() if "evaluation" in may] == []
 
 
 def test_the_check_would_catch_it():
-    # run_month is the one place that calls the door, so it must show up here.
-    assert {"bank_reader", "firm_connector"} <= _all_imports("run_month")
+    # review reaching into the door, and the agent reading the score: both must show up.
+    source = ("from liquet.door.bank.bank_reader import read_lines\n"
+              "import liquet.evaluation.score\n")
+    assert liquet_imports(source) - {"review"} - ALLOWED["review"] == {"door", "evaluation"}
