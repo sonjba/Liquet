@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import anthropic
 
 from liquet.config import DEFAULT_MODEL, load_settings
+from liquet.release import release_info
 from liquet.review.decide import load_reviews
 
 from liquet.review.decide import load_reviews
@@ -132,7 +133,8 @@ def investigate(client, run, item_id, source="claude", model=DEFAULT_MODEL):
                      "answer": answer, "outcome": outcome, "proposal_id": proposal_id,
                      "input_tokens": response.usage.input_tokens,
                      "output_tokens": response.usage.output_tokens,
-                     "stop_reason": response.stop_reason}
+                     "stop_reason": response.stop_reason,
+                     "release": release_info()}
     with open(run / "investigations.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(investigation) + "\n")
     return investigation

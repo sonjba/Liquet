@@ -95,3 +95,8 @@ def test_same_input_and_time_give_the_same_files(tmp_path):
         assert (a / name).read_text() == (b / name).read_text()
     run_a, run_b = (json.loads((f / "run.json").read_text()) for f in (a, b))
     assert run_a["counts"] == run_b["counts"] and run_a["run_id"] == run_b["run_id"]
+
+
+def test_run_json_names_the_code_that_produced_it(june):
+    release = load_run(june["folder"])["run"]["release"]
+    assert set(release) == {"liquet_version", "git_commit", "uncommitted_changes"}

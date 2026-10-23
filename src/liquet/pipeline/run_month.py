@@ -23,6 +23,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 from liquet.config import load_settings
+from liquet.release import release_info
 from liquet.matching.bank_prepare import bank_items
 from liquet.door.bank.bank_reader import read_statement
 from liquet.canonical.canonical_checks import validate_canonical_firm_data
@@ -104,7 +105,8 @@ def main(sources: dict[str, Path], runs_dir: Path, run_at: datetime) -> dict:
     check_match_result(month["bank_items"], month["firm_items"], month["result"])
 
     # 8. save the results: the handover to the agent and the person
-    save_results(month["folder"], month["header"], month["result"], run_at, received, STAGES)
+    save_results(month["folder"], month["header"], month["result"], run_at, received, STAGES,
+                 release_info())
     return month
 
 

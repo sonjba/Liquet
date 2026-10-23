@@ -1,6 +1,6 @@
 """Liquet's store: one folder per run, holding what came in, what it became, and
 what the rules decided.
-
+                 received: dict, stages: list[str], release: dict) -> None:
 One folder per account and month, and inside it one folder per run, so a
 month can be run again (for example after the firm corrects its books)
 without touching the earlier run:
@@ -147,7 +147,7 @@ def _restore(record: dict, dates: tuple, money: tuple) -> None:
 # ---------------- results ----------------
 
 def save_results(folder: Path, header: dict, result: dict, run_at: datetime,
-                 received: dict, stages: list[str]) -> None:
+                 received: dict, stages: list[str], release: dict) -> None:
     """Write decisions, findings and leftovers, then run.json last.
 
     run_at is passed in, not read from the clock here, so a test can give a
@@ -163,6 +163,7 @@ def save_results(folder: Path, header: dict, result: dict, run_at: datetime,
         "run_at": run_at.isoformat(),
         "received": received,
         "stages": stages,
+        "release": release,
         "counts": {"decisions": len(result["decisions"]),
                    "findings": len(result["findings"]),
                    "leftover_bank": len(result["unmatched_bank"]),

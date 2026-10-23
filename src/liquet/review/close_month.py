@@ -17,7 +17,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-
+from liquet.release import release_info
 from liquet.review.decide import load_reviews
 from liquet.review.propose import load_proposals
 from liquet.store.run_store import load_run,load_liquet_format
@@ -98,7 +98,8 @@ def close_month(run_folder, by, at, reason, unexplained_reasons):
     header = load_liquet_format(run_folder)["bank_statement"]["header"]
     closing = {"run_id": run["run_id"], "statement_id": run["statement_id"],
                "period_end": str(header["period_end"]), "closed_by": by,
-               "closed_at": at.isoformat(), "reason": reason, "carried": carried}
+               "closed_at": at.isoformat(), "reason": reason, "carried": carried,
+               "release": release_info()}
     with open(run_folder / CLOSING, "x", encoding="utf-8") as f:   # "x": never overwrite
         json.dump(closing, f, indent=2)
     return closing

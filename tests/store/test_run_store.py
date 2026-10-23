@@ -15,7 +15,7 @@ RUN_AT = datetime(2026, 7, 2, 9, 30, tzinfo=timezone.utc)
 SOURCES = {"header": JUNE / "statement_header.json", "lines": JUNE / "bank_statement.csv",
            "accounts": JUNE / "firm" / "accounts.json",
            "portfolios": JUNE / "firm" / "portfolios.json"}
-
+RELEASE = {"liquet_version": "0.1.0", "git_commit": "abc123", "uncommitted_changes": False}
 
 @pytest.fixture(scope="module")
 def june_data():
@@ -116,7 +116,7 @@ def _result():
 
 def test_results_and_run_json_are_written(header, tmp_path):
     folder = new_run_folder(tmp_path, header)
-    save_results(folder, header, _result(), RUN_AT, received={"lines": {}}, stages=["a", "b"])
+    save_results(folder, header, _result(), RUN_AT, received={"lines": {}}, stages=["a", "b"], release=RELEASE)
     run = load_run(folder)
     info = run["run"]
     assert info["run_id"] == "ACC-KRW-CASH-01_2026-06/run-001"
@@ -124,6 +124,7 @@ def test_results_and_run_json_are_written(header, tmp_path):
     assert info["period_end"] == "2026-06-30"
     assert info["run_at"] == "2026-07-02T09:30:00+00:00"
     assert info["stages"] == ["a", "b"]
+    assert info["release"] == RELEASE
     assert info["counts"] == {"decisions": 1, "findings": 1, "leftover_bank": 0,
                               "leftover_firm": 1}
     assert run["decisions"][0]["differences"][0]["difference"] == "-225.00"
@@ -132,7 +133,7 @@ def test_results_and_run_json_are_written(header, tmp_path):
 
 def test_saving_does_not_change_the_result_in_memory(header, tmp_path):
     result = _result()
-    save_results(tmp_path, header, result, RUN_AT, received={}, stages=[])
+    save_results(tmp_path, header, result, RUN_AT, received={}, stages=[], release=RELEASE)
     assert "proposed_at" not in result["findings"][0]
 
 
@@ -142,12 +143,12 @@ def test_a_run_without_run_json_did_not_finish(tmp_path):
 
 
 def test_results_are_never_overwritten(header, tmp_path):
-    save_results(tmp_path, header, _result(), RUN_AT, received={}, stages=[])
+    save_results(tmp_path, header, _result(), RUN_AT, received={}, stages=[], release=RELEASE)
     with pytest.raises(FileExistsError, match="never overwritten"):
-        save_results(tmp_path, header, _result(), RUN_AT, received={}, stages=[])
+        save_results(tmp_path, header, _result(), RUN_AT, received={}, stages=[], release=RELEASE)
 
 
 def test_something_json_cannot_hold_is_refused(header, tmp_path):
     bad = dict(_result(), decisions=[{"oops": {1, 2}}])
     with pytest.raises(TypeError, match="can't save set"):
-        save_results(tmp_path, header, bad, RUN_AT, received={}, stages=[])
+        save_results(tmp_path, header, bad, RUN_AT, received={}, stages=[], release=RELEASE)
