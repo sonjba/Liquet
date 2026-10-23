@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import run_month
+import liquet.pipeline.run_month as run_month
 from liquet.graph.build_graph import build_graph, describe, finding_node_id, load_snapshot, save_snapshot
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

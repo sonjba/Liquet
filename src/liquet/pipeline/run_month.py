@@ -14,7 +14,7 @@ data read back from the run folder, so what is stored is provably what
 matching used. A new bank or firm changes `ingest` (its readers and
 mappings) and nothing else.
 
-    python run_month.py --header ... --lines ... --accounts ... --portfolios ...
+    python -m liquet.pipeline.run_month --header ...
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from liquet.matching.match import match
 from liquet.matching.match_checks import check_match_result
 from liquet.store.run_store import (fingerprints, load_liquet_format, new_run_folder, save_liquet_format,
                        save_received, save_results)
-from carry import carried_items, previous_closing, save_brought_forward
+from liquet.pipeline.carry import carried_items, previous_closing, save_brought_forward
 
 STAGES = ["receive", "ingest", "store", "bring_forward", "prepare", "match", "check", "save"]
 

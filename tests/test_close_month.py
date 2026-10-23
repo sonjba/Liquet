@@ -11,7 +11,7 @@ from liquet.review.close_month import what_to_carry, close_month
 
 from liquet.review.decide import record
 from liquet.review.investigate import ReplayClaude, investigate
-from run_month import main as run_month
+from liquet.pipeline.run_month import main as run_month
 from liquet.review.work_list import open_items
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

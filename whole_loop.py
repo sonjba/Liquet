@@ -56,7 +56,7 @@ def main(runs, live=False):
     runs = Path(runs).resolve()   # the same folder wherever you start the script from
     print("1. Run the month")
     run = folder_after("Saved to", command(
-        "run_month.py", "--header", JUNE / "statement_header.json",
+                "-m", "liquet.pipeline.run_month", "--header", JUNE / "statement_header.json",
         "--lines", JUNE / "bank_statement.csv",
         "--accounts", JUNE / "firm" / "accounts.json",
         "--portfolios", JUNE / "firm" / "portfolios.json", "--runs", runs))

@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from liquet.door.bank.bank_reader import check_continuity, read_header, read_statement
-from run_month import main as run_month
+from liquet.pipeline.run_month import main as run_month
 from liquet.review.work_list import open_items
 
 FIXTURES = Path(__file__).parent / "fixtures"

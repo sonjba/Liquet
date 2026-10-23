@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from liquet.graph.build_graph import build_graph, save_snapshot
-from run_month import main as run_month
+from liquet.pipeline.run_month import main as run_month
 from liquet.graph.show_graph import short_label, write_graph_page
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

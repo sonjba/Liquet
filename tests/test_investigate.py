@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from liquet.review.investigate import ReplayClaude, investigate
-from run_month import main as run_month
+from liquet.pipeline.run_month import main as run_month
 from score import score
 from liquet.review.work_list import open_items
 

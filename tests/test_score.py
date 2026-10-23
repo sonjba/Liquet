@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from liquet.review.propose import record_proposal
-from run_month import main as run_month
+from liquet.pipeline.run_month import main as run_month
 from score import score
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

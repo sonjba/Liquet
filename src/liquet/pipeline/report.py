@@ -1,6 +1,6 @@
 """Read a saved run back to a person: the same report run_month.py prints.
 
-    python report.py runs/ACC-KRW-CASH-01_2026-06/run-004
+    python -m liquet.pipeline.report runs/...
 
 It only reads the run folder. It never changes anything.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from liquet.matching.bank_prepare import bank_items
 from liquet.matching.firm_prepare import firm_items
-from run_month import show
+from liquet.pipeline.run_month import show
 from liquet.store.run_store import load_liquet_format, load_run
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import run_month
+import liquet.pipeline.run_month as run_month
 from liquet.store.run_store import load_liquet_format, load_run
 
 JUNE = Path(__file__).parent / "fixtures" / "2026-06"

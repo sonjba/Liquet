@@ -11,7 +11,7 @@ import pytest
 from liquet.review.close_month import close_month
 from liquet.review.decide import record
 from liquet.review.investigate import ReplayClaude, investigate
-from run_month import main as run_month
+from liquet.pipeline.run_month import main as run_month
 from liquet.store.run_store import load_run
 from liquet.review.work_list import open_items
 
