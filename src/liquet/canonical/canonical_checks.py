@@ -76,7 +76,7 @@ class CanonicalCheckError(ValueError):
                          + "\n  ".join(problems))
 
 
-def check_canonical(data: dict[str, list[dict]], period_start: date) -> None:
+def validate_canonical_firm_data(data: dict[str, list[dict]], period_start: date) -> None:
     """Run every check; raise CanonicalCheckError listing all problems found.
 
     period_start is the first day of the month being reconciled, e.g.
@@ -100,7 +100,7 @@ def check_canonical(data: dict[str, list[dict]], period_start: date) -> None:
         raise CanonicalCheckError(problems)
 
 
-def _name(record: dict, collection: str) -> str:
+def _canonical_record_label(record: dict, collection: str) -> str:
     """How a problem names a record: its id, and where it came from."""
     record_id = "/".join(str(record.get(f)) for f in ID_FIELDS[collection])
     return f"{collection} {record_id} ({record.get('source', 'no source')})"
@@ -116,7 +116,7 @@ def check_ids_are_unique(data: dict) -> list[str]:
         for record in data[collection]:
             key = tuple(record.get(f) for f in fields)
             if key in seen:
-                problems.append(f"check 1, {_name(record, collection)}: same id as "
+                problems.append(f"check 1, {_canonical_record_label(record, collection)}: same id as "
                                 f"{seen[key].get('source', 'no source')}")
             else:
                 seen[key] = record
@@ -136,7 +136,7 @@ def check_references_exist(data: dict) -> list[str]:
             if value is None and (collection, field) in NULL_ALLOWED:
                 continue
             if value not in ids[target]:
-                problems.append(f"check 2, {_name(record, collection)}: {field} "
+                problems.append(f"check 2, {_canonical_record_label(record, collection)}: {field} "
                                 f"{value!r} is not in {target}")
     return problems
 
@@ -149,18 +149,18 @@ def check_trades_add_up(data: dict) -> list[str]:
     for trade in data["trades"]:
         quantity, side = trade.get("quantity"), trade.get("side")
         if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0:
-            problems.append(f"check 3, {_name(trade, 'trades')}: quantity must be a "
+            problems.append(f"check 3, {_canonical_record_label(trade, 'trades')}: quantity must be a "
                             f"whole number above 0, got {quantity!r}")
             continue
         if side not in ("BUY", "SELL"):
-            problems.append(f"check 3, {_name(trade, 'trades')}: side must be BUY or "
+            problems.append(f"check 3, {_canonical_record_label(trade, 'trades')}: side must be BUY or "
                             f"SELL, got {side!r}")
             continue
         gross = quantity * Decimal(trade["price"])
         costs = Decimal(trade["costs"])
         expected = gross + costs if side == "BUY" else gross - costs
         if Decimal(trade["settlement_amount"]) != expected:
-            problems.append(f"check 3, {_name(trade, 'trades')}: settlement_amount "
+            problems.append(f"check 3, {_canonical_record_label(trade, 'trades')}: settlement_amount "
                             f"{trade['settlement_amount']}, expected {expected} "
                             f"({quantity} x {trade['price']} {'+' if side == 'BUY' else '-'} "
                             f"{trade['costs']})")
@@ -173,7 +173,7 @@ def check_cash_entries(data: dict) -> list[str]:
     """Check 4: exactly one of debit or credit, and the right links for the entry type."""
     problems = []
     for entry in data["cash_book"]:
-        name, kind = _name(entry, "cash_book"), entry.get("entry_type")
+        name, kind = _canonical_record_label(entry, "cash_book"), entry.get("entry_type")
         if (entry.get("debit") is None) == (entry.get("credit") is None):
             problems.append(f"check 4, {name}: needs exactly one of debit or credit")
         if kind in CLIENT_ENTRY_TYPES and entry.get("portfolio_id") is None:
@@ -200,7 +200,7 @@ def check_settlements_match_trades(data: dict) -> list[str]:
         trade = trades.get(entry.get("trade_id"))
         if entry.get("entry_type") != "TRADE_SETTLEMENT" or trade is None:
             continue   # a missing trade is reported by checks 2 and 4
-        name = _name(entry, "cash_book")
+        name = _canonical_record_label(entry, "cash_book")
         column = "credit" if trade["side"] == "BUY" else "debit"
         amount = entry.get(column)
         if amount is None:
@@ -226,7 +226,7 @@ def check_money_is_text(data: dict) -> list[str]:
             if value is None and collection == "cash_book":
                 continue   # the empty side of debit/credit; check 4 decides
             if not isinstance(value, str) or not pattern.fullmatch(value):
-                problems.append(f"check 6, {_name(record, collection)}: {field} must be "
+                problems.append(f"check 6, {_canonical_record_label(record, collection)}: {field} must be "
                                 f"text with two decimals, got {value!r}")
     return problems
 
@@ -238,6 +238,6 @@ def check_opening_balance_exists(data: dict, period_start: date) -> list[str]:
     period starts (for June: 31 May). Without it, closing balances can't be compared."""
     day_before = (period_start - timedelta(days=1)).isoformat()
     have = {(b.get("account_id"), b.get("as_of")) for b in data["account_balances"]}
-    return [f"check 8, {_name(account, 'accounts')}: no opening balance as of {day_before}"
+    return [f"check 8, {_canonical_record_label(account, 'accounts')}: no opening balance as of {day_before}"
             for account in data["accounts"]
             if (account.get("account_id"), day_before) not in have]
