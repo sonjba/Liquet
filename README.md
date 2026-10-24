@@ -1,4 +1,5 @@
 # Liquet
+[![tests](https://github.com/sonjba/Liquet/actions/workflows/tests.yml/badge.svg)](https://github.com/sonjba/Liquet/actions/workflows/tests.yml)
 
 **AI-assisted monthly bank reconciliation: rules match, an agent explains the rest, a person approves.**
 
@@ -295,31 +296,22 @@ It separates three things:
 
 ## Status
 
-## Status
-
 Built so far:
 
-- **The door.** Bank statement reader (CSV + header) with type conversion, input validation
-  and self-checks (totals, running balance, dates). Firm connector with path-based mapping
-  into canonical collections, and canonical checks. A continuity check between statements.
-- **Store.** One folder per run, never overwritten: received files with fingerprints,
-  Liquet-format data, results.
-- **Matching rules R1–R5** (plus R2a for overseas withholding tax), and checks after
-  matching: nothing matched twice, nothing lost.
-- **The work list.** What the rules left open, worked out from the run folder alone.
-- **Investigation, tier 1.** Code gathers the facts for each open item (`facts.py`), Claude
-  answers in a fixed form (`investigate.py`), and the answer is checked before it becomes
-  a proposal (`propose.py`). Every call is logged, `NON LIQUET` included, and can be
-  replayed from the log for free.
-- **Review.** A person approves or rejects each finding and proposal, with a reason
-  (`decide.py`). Only a person decides.
-- **Temporal graph** in Raphtory, rebuilt from the run folder, with checked Parquet snapshots
-  after the rules, after Claude and after review.
-- **Score.** Each run checked against the answer key (`score.py`).
-- **Tests** for each part, including tests that fail if code after the door imports the door.
+- **Closing a month.** One run per month is marked final by a person, and what is still open
+  is carried into the next month, each item with a reason (`close_month.py`).
+- **Carry-forward and R0.** The next month starts from what the last one carried; R0 clears a
+  carried item when its bank line arrives, and flags it if it arrived late. A July fixture
+  tests this end to end.
+- **Run identity.** Every run, investigation and closing records the Liquet version and the
+  git commit that produced it.
+- **One command.** `liquet run`, `liquet investigate`, `liquet decide`, `liquet close` and more;
+  settings come from the environment (`LIQUET_RUNS_DIR`, `LIQUET_MODEL`).
+- **CI.** The tests run on Linux and Windows on every push.
 
-Next: the tool loop for what one call can't explain, closing a month and carrying open items
-into the next, and a July fixture. The plan is in [`docs/later.md`](docs/later.md).
+Next: remodelling the graph as a context graph that spans months (every judgement with who,
+why, on what evidence and under which rule), then the tool loop for what one call can't
+explain. The plan is in [`docs/later.md`](docs/later.md).
 
 ---
 
@@ -330,20 +322,22 @@ Needs Python 3.11 or newer (Raphtory requires it).
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 
 pytest -q
 python scripts/whole_loop.py
 ```
 
-`whole_loop.py` runs June from start to finish, through the same commands a person types:
-the rules, Claude's investigation, the graph after each stage, a person's decisions (a demo),
-and the score. By default it replays Claude's real answers from an earlier run, so it needs
-no API key and costs nothing.
+`whole_loop.py` runs June from start to finish, through the same `liquet` commands a person
+types: the rules, Claude's investigation, the graph after each stage, a person's decisions
+(a demo), and the score. By default it replays Claude's real answers from an earlier run, so
+it needs no API key and costs nothing.
 
-To ask Claude for real, put your key in a `.env` file (see `.env.example`; `.env` is never
-committed) and run `python scripts/whole_loop.py --live`. It stops before the decisions, because a
-person makes those.
+Type `liquet` to see every command, and `liquet <command> --help` for its options. Settings
+come from the environment or a `.env` file (see `.env.example`; `.env` is never committed):
+`LIQUET_RUNS_DIR` (default `runs`) and `LIQUET_MODEL`. To ask Claude for real, add your
+`ANTHROPIC_API_KEY` there and run `python scripts/whole_loop.py --live`. It stops before the
+decisions, because a person makes those.
 
 ---
 
