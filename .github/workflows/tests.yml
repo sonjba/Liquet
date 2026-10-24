@@ -1,0 +1,38 @@
+# Run Liquet's tests on every push and pull request, on Linux and Windows.
+# Nothing here uses the API key: the tests replay Claude's answers.
+
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read          # this workflow only reads the code
+
+jobs:
+  pytest:
+    strategy:
+      fail-fast: false    # let both systems finish, so one failure doesn't hide the other
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Liquet and its test tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run the tests
+        run: python -m pytest -q
+
+      - name: Check the liquet command exists
+        run: liquet --help
