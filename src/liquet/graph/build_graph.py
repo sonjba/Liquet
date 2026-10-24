@@ -54,6 +54,7 @@ from raphtory import Graph
 
 from liquet.matching.firm_prepare import firm_items
 from liquet.review.decide import load_reviews
+from liquet.review.investigate import INVESTIGATIONS
 from liquet.review.propose import load_proposals
 from liquet.store.run_store import _to_text, load_liquet_format, load_run
 
@@ -241,7 +242,7 @@ def _add_reviews(g: Graph, reviews: list[dict], run: dict) -> None:
 
 def load_investigations(run_folder: Path) -> list[dict]:
     """Every call to Claude logged in RUN/investigations.jsonl, oldest first."""
-    path = Path(run_folder) / "investigations.jsonl"
+    path = Path(run_folder) / INVESTIGATIONS
     if not path.exists():
         return []
     with open(path, encoding="utf-8") as f:

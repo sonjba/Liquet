@@ -22,6 +22,7 @@ COMMANDS = {
     "graph-json":  ("liquet.graph.graph_to_json",  "write a snapshot as readable JSON"),
     "graph-page":  ("liquet.graph.show_graph",     "draw a snapshot as a web page"),
     "score":       ("liquet.evaluation.score",     "score a run against an answer key (the builder's check)"),
+    "status":      ("liquet.workflow.month",       "where a run stands, and what comes next"),
 }
 
 

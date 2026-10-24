@@ -32,6 +32,7 @@ ALLOWED = {
     "graph":      {"matching", "review", "store"},           # the temporal graph
     "pipeline":   {"door", "canonical", "matching", "store"},  # runs a month: the only door user
     "evaluation": {"review", "store"},                       # the score: nobody imports it
+    "workflow":   {"pipeline", "review", "store"},           # the order of the month: nobody imports it
 }
 
 
@@ -95,6 +96,9 @@ def test_only_the_pipeline_may_use_the_door():
 def test_nothing_may_use_evaluation():
     assert [part for part, may in ALLOWED.items() if "evaluation" in may] == []
 
+def test_nothing_may_use_the_workflow():
+    # the workflow looks at every step; no step may depend on the order it is described in
+    assert [part for part, may in ALLOWED.items() if "workflow" in may] == []
 
 def test_the_check_would_catch_it():
     # review reaching into the door, and the agent reading the score: both must show up.

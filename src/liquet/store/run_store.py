@@ -40,6 +40,7 @@ from pathlib import Path
 # The two folders of a run: what arrived, and the same data after the door.
 RECEIVED = "received"
 LIQUET_FORMAT = "liquet_format"
+RUN_FILE = "run.json"          # written last: its presence means the run finished
 
 # Which fields of a Liquet bank statement are dates and money. Saved as text,
 # turned back into date and Decimal by load_liquet_format().

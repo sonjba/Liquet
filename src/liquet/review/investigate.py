@@ -29,6 +29,7 @@ from liquet.review.propose import load_proposals, record_proposal
 from liquet.review.work_list import open_items
 
 
+INVESTIGATIONS = "investigations.jsonl"
 job = """You are Quaestor, the investigator in Liquet, a monthly bank reconciliation.
 Use only the facts you are given. If they are not enough, say so.
 You suggest an explanation; a person decides.
@@ -136,7 +137,7 @@ def investigate(client, run, item_id, source="claude", model=DEFAULT_MODEL):
                      "output_tokens": response.usage.output_tokens,
                      "stop_reason": response.stop_reason,
                      "release": release_info()}
-    with open(run / "investigations.jsonl", "a", encoding="utf-8") as f:
+    with open(run / INVESTIGATIONS, "a", encoding="utf-8") as f:
         f.write(json.dumps(investigation) + "\n")
     return investigation
 

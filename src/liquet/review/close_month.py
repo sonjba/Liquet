@@ -27,18 +27,30 @@ from liquet.review.facts import load_run_data
 
 CLOSING = "closing.json"
 
+def explanations_of(run_folder):
+    """Every explanation in the run, oldest first: the rules' findings, then the proposals.
+    Each is (id, the item ids it explains, category, explanation)."""
+    findings = load_run(run_folder)["findings"]
+    proposals = load_proposals(run_folder)
+    return ([(f["finding_id"], f["bank_ids"] + f["firm_ids"], f["category"], f["explanation"])
+             for f in findings] +
+            [(p["proposal_id"], p["item_ids"], p["category"], p["explanation"])
+             for p in proposals])
+
+
+def waiting_for_a_person(run_folder):
+    """The findings and proposals no person has decided yet, by id."""
+    decided = {review["finding_id"] for review in load_reviews(run_folder)}
+    return [name for name, *_ in explanations_of(run_folder) if name not in decided]
+
 
 def what_to_carry(run_folder, unexplained_reasons):
     """What this month hands to the next. Stops if anything still waits for a person."""
     findings = load_run(run_folder)["findings"]
-    proposals = load_proposals(run_folder)
     reviews = {review["finding_id"]: review["kind"] for review in load_reviews(run_folder)}
-    explanations = ([(f["finding_id"], f["bank_ids"] + f["firm_ids"], f["category"],
-                      f["explanation"]) for f in findings] +
-                    [(p["proposal_id"], p["item_ids"], p["category"], p["explanation"])
-                     for p in proposals])
+    explanations = explanations_of(run_folder)
 
-    waiting = [name for name, *_ in explanations if name not in reviews]
+    waiting = waiting_for_a_person(run_folder)
     if waiting:
         raise ValueError(f"still waiting for a person to decide: {', '.join(waiting)}")
     rejected_rules = [f["finding_id"] for f in findings if reviews[f["finding_id"]] == "REJECTED"]
