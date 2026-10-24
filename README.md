@@ -1,5 +1,4 @@
-# Liquet
-[![tests](https://github.com/sonjba/Liquet/actions/workflows/tests.yml/badge.svg)](https://github.com/sonjba/Liquet/actions/workflows/tests.yml)
+# Liquet [![tests](https://github.com/sonjba/Liquet/actions/workflows/tests.yml/badge.svg)](https://github.com/sonjba/Liquet/actions/workflows/tests.yml)
 
 **AI-assisted monthly bank reconciliation: rules match, an agent explains the rest, a person approves.**
 
