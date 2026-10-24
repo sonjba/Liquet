@@ -14,6 +14,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import anthropic
@@ -140,15 +141,16 @@ def investigate(client, run, item_id, source="claude", model=DEFAULT_MODEL):
     return investigation
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ask Claude about a run's open items.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Ask Claude about a run's open items.")
     parser.add_argument("run_folder", type=Path)
     parser.add_argument("item_id", nargs="?", help="one item; leave out for all open items")
     parser.add_argument("--replay", type=Path,
                         help="reuse answers from an investigations.jsonl instead of calling Claude")
     parser.add_argument("--model", help="the Claude model to ask (default: LIQUET_MODEL, else "
                                         f"{DEFAULT_MODEL})")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     run = args.run_folder
     settings = load_settings()                     # also loads .env, for the API key
     model = args.model or settings.model
@@ -170,3 +172,7 @@ if __name__ == "__main__":
         print(f"{item_id}: {investigation['outcome']}")
         print(f"  {investigation['answer']['explanation']}")
         print(f"  tokens in {investigation['input_tokens']}, out {investigation['output_tokens']}")
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

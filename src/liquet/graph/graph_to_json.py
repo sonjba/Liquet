@@ -10,6 +10,7 @@ Nodes are grouped by type, edges by layer, so you can find
 import argparse
 import json
 from pathlib import Path
+import sys
 
 from liquet.graph.build_graph import load_snapshot
 
@@ -40,7 +41,12 @@ def write_graph_json(snapshot_folder: Path) -> Path:
     return page
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Write a saved graph snapshot as readable JSON.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Write a saved graph snapshot as readable JSON.")
     parser.add_argument("snapshot_folder", type=Path, help="a folder inside the run's graph/")
-    print(f"Written {write_graph_json(parser.parse_args().snapshot_folder)}")
+    print(f"Written {write_graph_json(parser.parse_args(argv).snapshot_folder)}")
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 from liquet.config import load_settings
 from liquet.release import release_info
 from liquet.matching.bank_prepare import bank_items
@@ -140,17 +141,22 @@ def show(month: dict) -> None:
     print(f"\nSaved to {month['folder']}")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Reconcile one month.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Reconcile one month.")
     parser.add_argument("--header", type=Path, required=True, help="bank statement header (JSON)")
     parser.add_argument("--lines", type=Path, required=True, help="bank statement lines (CSV)")
     parser.add_argument("--accounts", type=Path, required=True, help="firm accounts (JSON)")
     parser.add_argument("--portfolios", type=Path, required=True, help="firm portfolios (JSON)")
     parser.add_argument("--runs", type=Path,
                         help="folder that holds every run (default: LIQUET_RUNS_DIR, else runs)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     runs = args.runs or load_settings().runs_dir
 
     sources = {"header": args.header, "lines": args.lines,
                "accounts": args.accounts, "portfolios": args.portfolios}
     show(main(sources, runs, run_at=datetime.now(timezone.utc)))
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

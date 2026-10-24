@@ -17,6 +17,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 
 from liquet.store.run_store import load_run
 
@@ -59,15 +60,16 @@ def record(run_folder: Path, kind: str, finding_id: str, by: str, at: datetime,
     return review
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Approve or reject a finding or a proposal.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Approve or reject a finding or a proposal.")
     parser.add_argument("run_folder", type=Path)
     parser.add_argument("action", choices=["approve", "reject"])
     parser.add_argument("finding_id")
     parser.add_argument("--by", required=True, help="your name")
     parser.add_argument("--code", required=True, choices=REASON_CODES, help="reason code")
     parser.add_argument("--reason", default="", help="in words; needed when you reject")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     kind = "APPROVED" if args.action == "approve" else "REJECTED"
     try:
@@ -75,4 +77,9 @@ if __name__ == "__main__":
                         datetime.now(timezone.utc), args.code, args.reason)
         print(f"Saved: {review['finding_id']} {review['kind']} by {review['by']}")
     except ValueError as error:
-        print(f"Not saved: {error}")
+        print(f"Not saved: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

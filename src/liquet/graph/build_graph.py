@@ -48,6 +48,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+import sys
 
 from raphtory import Graph
 
@@ -314,15 +315,15 @@ def load_snapshot(folder: Path) -> Graph:
     """Read a saved snapshot back into a graph."""
     return Graph.from_parquet(str(folder))
 
-
-if __name__ == "__main__":
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
     import argparse
     from datetime import timezone
 
-    parser = argparse.ArgumentParser(description="Build the graph for a saved run.")
+    parser = argparse.ArgumentParser(prog=prog, description="Build the graph for a saved run.")
     parser.add_argument("run_folder", type=Path, help="e.g. runs/ACC-KRW-CASH-01_2026-06/run-001")
     parser.add_argument("--snapshot", action="store_true", help="also save a checked snapshot")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     graph = build_graph(args.run_folder)
     print(f"{graph.count_nodes()} nodes, {graph.count_edges()} edges")
@@ -338,3 +339,7 @@ if __name__ == "__main__":
             stage = "rules"
         folder = save_snapshot(graph, args.run_folder, stage, datetime.now(timezone.utc))
         print(f"Snapshot saved to {folder}")
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

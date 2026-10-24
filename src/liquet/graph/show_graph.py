@@ -16,6 +16,7 @@ Needs pyvis (pip install pyvis).
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 from liquet.graph.build_graph import load_snapshot
 
@@ -52,9 +53,14 @@ def write_graph_page(snapshot_folder: Path) -> Path:
     return page
 
 
-if __name__ == "__main__":
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Draw a saved graph snapshot as a web page.")
+    parser = argparse.ArgumentParser(prog=prog, description="Draw a saved graph snapshot as a web page.")
     parser.add_argument("snapshot_folder", type=Path, help="a folder inside the run's graph/")
-    print(f"Open {write_graph_page(parser.parse_args().snapshot_folder)} in a browser")
+    print(f"Open {write_graph_page(parser.parse_args(argv).snapshot_folder)} in a browser")
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

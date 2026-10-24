@@ -17,6 +17,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 from liquet.release import release_info
 from liquet.review.decide import load_reviews
 from liquet.review.propose import load_proposals
@@ -105,14 +106,15 @@ def close_month(run_folder, by, at, reason, unexplained_reasons):
     return closing
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Mark a run final and carry what is left.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Mark a run final and carry what is left.")
     parser.add_argument("run_folder", type=Path)
     parser.add_argument("--by", required=True, help="your name: only a person closes a month")
     parser.add_argument("--reason", required=True)
     parser.add_argument("--carry", nargs=2, action="append", default=[],
                         metavar=("ITEM_ID", "REASON"), help="carry an unexplained item")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         closing = close_month(args.run_folder, args.by, datetime.now(timezone.utc),
                               args.reason, dict(args.carry))
@@ -120,4 +122,9 @@ if __name__ == "__main__":
         for item in closing["carried"]:
             print(f"  carried {item['status']:<11} {', '.join(item['item_ids'])}  {item['reason']}")
     except ValueError as error:
-        print(f"Not closed: {error}")
+        print(f"Not closed: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

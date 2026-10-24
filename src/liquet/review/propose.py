@@ -19,6 +19,7 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+import sys
 
 from liquet.review.decide import load_reviews
 from liquet.review.work_list import open_items
@@ -102,8 +103,9 @@ def record_proposal(run_folder: Path, item_ids: list[str], category: str, type_:
     return proposal
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Propose an explanation for open items.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Propose an explanation for open items.")
     parser.add_argument("run_folder", type=Path)
     parser.add_argument("item_ids", nargs="+", help="ids from work_list.py")
     parser.add_argument("--category", required=True, choices=list(TYPES))
@@ -112,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--adjustment", required=True, help="e.g. -45.00")
     parser.add_argument("--explanation", required=True)
     parser.add_argument("--by", required=True, help="your name")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         p = record_proposal(args.run_folder, args.item_ids, args.category, args.type_,
                             args.adjusts, args.adjustment, args.explanation, args.by,
@@ -120,4 +122,9 @@ if __name__ == "__main__":
         print(f"Saved: {p['proposal_id']} {p['category']} / {p['type']}, "
               f"adjust {p['adjusts']} {p['adjustment']}")
     except ValueError as error:
-        print(f"Not saved: {error}")
+        print(f"Not saved: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

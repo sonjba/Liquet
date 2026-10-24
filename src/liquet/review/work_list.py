@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 from decimal import Decimal
 from pathlib import Path
+import sys
 
 from liquet.store.run_store import load_run
 
@@ -57,10 +58,11 @@ def open_items(run_folder: Path) -> list[dict]:
     return items + list(differences.values())
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="List what is still open in a run.")
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="List what is still open in a run.")
     parser.add_argument("run_folder", type=Path)
-    items = open_items(parser.parse_args().run_folder)
+    items = open_items(parser.parse_args(argv).run_folder)
     print(f"Open items: {len(items)}")
     for item in items:
         if item["kind"] == "UNMATCHED":
@@ -69,3 +71,7 @@ if __name__ == "__main__":
         else:
             print(f"  {item['item_id']:<30} {item['rule']} matched {len(item['firm_ids'])} entries,"
                   f" difference {item['difference']} not explained")
+
+
+if __name__ == "__main__":
+    sys.exit(cli())
