@@ -1,51 +1,182 @@
-# Liquet — graph map (v1)
+# Liquet — graph map (v2)
 #
-# How canonical records become a graph. build_graph.py follows this file (it
-# does not read it); the agent will read it to understand what exists and what
-# each link means.
+# What Liquet's temporal graph holds, and what each part means. build_graph.py
+# follows this file (it does not read it); tests check the two agree (planned, G2);
+# the agent will read it to understand what exists and what each link means.
 #
-# The graph is built from CANONICAL records (see docs/canonical-format.md and
-# docs/file-formats.md), never from the firm's document structure.
-# This file does not contain matching logic: matching rules live in the
-# matching engine (see docs/matching-rules.md), and their results are the
-# `reconciliation` edges and the `Finding` result node below.
+# v2 makes the graph a context graph: besides the records, it holds every
+# judgement — who made it, why, on what evidence, under which rule, and when —
+# across months, not just one run. Everything below says whether it is built
+# now or planned, and in which step (G2-G6, docs/later.md).
+#
+# The graph is built from Liquet's own format (docs/canonical-format.md), never
+# from a bank's or a firm's files. It holds no matching logic: the rules live
+# in the matching engine (docs/matching-rules.md); their results are judgements.
 
-version: 1
+version: 2
 
 graph:
   name: liquet
   description: >
     Cash records of Kestrel Row Wealth Ltd and the bank's statements for the
-    same pooled custody account, connected so that differences between the
-    two can be traced and explained.
+    same pooled custody account, and every judgement made about them: matches,
+    findings, investigations, reviews and month closings, each with who made
+    it, why, on what evidence and when. Built from the run folders, which stay
+    the source of truth; the graph can always be rebuilt from them.
+
+# ---------------------------------------------------------------- conventions
 
 conventions:
-  identifiers: >
-    Every node has a stable key, unique within its collection.
+  identifiers: Every node has a stable key, unique within its type.
   amounts: >
     Money is Decimal. `amount` is signed: positive = money into the account,
-    negative = money out. It is derived by the reader from debit/credit
-    (firm side) or paid_in/paid_out (bank side).
-  dates: >
-    ISO 8601 (YYYY-MM-DD).
-  time: >
-    `time` names the field that dates an edge, and which end it is read from.
-    `null` means the link is not tied to a moment.
-  is_event: >
-    true if the edge records something that happened at a point in business
-    time (a settlement, a dividend payment); false if it only states a
-    structural fact (who owns what, what belongs where).
+    negative = money out.
+  dates: ISO 8601 (YYYY-MM-DD); moments are ISO 8601 with a time zone.
+  status: >
+    built = in build_graph.py now. planned = decided here, built in the step
+    named (G2-G6).
+  group: >
+    Every node type and edge layer belongs to exactly one group (see groups).
+  prov: >
+    The W3C PROV-O term each part corresponds to (https://www.w3.org/ns/prov-o):
+    Entity (a thing), Activity (something that happens), Agent (who is
+    responsible), and the links between them. Documentation only: Liquet does
+    not export RDF.
   cardinality: >
-    `from` = how many edges of this type each from-node has;
-    `to` = how many each to-node has. Written as 1, 0..1, 0..*, 1..*.
-    Planned: the graph builder will check these after building and stop if
-    any fails. Not built yet.
+    `from` = how many edges of this layer each from-node has; `to` = how many
+    each to-node has. Written as 1, 0..1, 0..*, 1..*. Planned: checked after
+    building (G2).
+
+# ---------------------------------------------------------------- clocks
+
+clocks:
+  rule: >
+    Everything is placed in the graph at the moment it came into being: money
+    when it moved, a judgement when it was made. So a view of the graph before
+    a date shows the money that had moved and the judgements already made.
+  happened: >
+    Raphtory's time axis. Records: their own business dates. Judgements and
+    reasoning: the moment they were made (run_at, a proposal's or review's at).
+  known: >
+    When Liquet learned a record is the second clock. It lives in two places:
+    every run snapshot (graph/<time>_<stage>/ in the run folder) is what Liquet
+    knew at that moment, and every record carries `known_at` (planned, G3): the
+    run_at of the first run that received it.
+  static_records: >
+    Clients, portfolios, accounts, securities and the links between them have no
+    date of their own. They are placed on the day before the period starts
+    ("already known when the month began").
+
+# ---------------------------------------------------------------- groups
+
+groups:
+  facts:
+    description: What the bank and the firm say. Never changed by Liquet.
+    prov: Entity
+  judgements:
+    description: >
+      What Liquet and people concluded: matches, findings, reviews, runs and
+      month closings. Each one answers the decision-trace questions below.
+    rule: >
+      A match pairs two records and needs no person: the rules are trusted to
+      pair. A finding explains a difference and always ends with a person's
+      Review, whoever proposed it: a rule (R2a, R5), the agent (P1-P3) or a
+      person. The system proposes; a person approves.
+  reasoning:
+    description: >
+      How the agent got to a proposal: each call to Claude, what it was about,
+      what it was shown, and what it produced.
+  actors:
+    description: Who acted. One node per actor; `kind` says person, agent or rule.
+    prov: Agent
+  agent_access: >
+    Planned (G6). The agent reads facts and judgements about the item it is
+    investigating as evidence. Judgements about other, look-alike items are
+    hints for its questions, never evidence (CONSULTED). The agent never writes
+    to the graph: it proposes, code checks, a person decides.
+
+# ---------------------------------------------------------------- decision trace
+
+# The questions every judgement must answer, and the edge or property that
+# answers each. A blank is a gap; the step that fills it is named.
+decision_trace:
+  questions:
+    about: What it is about.
+    by: Who made it.
+    using: What evidence it used.
+    under: Which rule or reason.
+    result: What it concluded.
+    when: When it was made (the node's or edge's time).
+  answered_by:
+    MATCHED_TO:
+      about: the bank line and the firm movement it joins
+      by: property rule (rule R0-R5)
+      using: property evidence
+      under: property rule
+      result: properties verdict, differences
+    Finding:
+      about: EXPLAINS_LINE, EXPLAINS_MOVEMENT, FINDING_FOR
+      by: PROPOSED_BY
+      using: property evidence; for the agent's, the Investigation that PRODUCED it
+      under: the rule actor, or the agent's job and model
+      result: properties category, type, adjusts, adjustment, explanation
+    Review:
+      about: DECIDES
+      by: MADE_BY
+      using: the Finding it decides
+      under: properties reason_code, reason
+      result: property kind (APPROVED or REJECTED)
+    Investigation:
+      about: INVESTIGATED
+      by: RUN_BY
+      using: EXAMINED; later CONSULTED (G6)
+      under: properties model, question
+      result: properties answer, outcome; PRODUCED or ESCALATED_TO (G4)
+    Run:
+      about: RECONCILES (G3)
+      by: RUN_BY to the software actor (G3)
+      using: properties received (fingerprints of the files read)
+      under: property release (code version and commit)
+      result: properties counts
+    Closing:
+      about: CLOSES (G5)
+      by: MADE_BY (G5)
+      using: the Run it closes
+      under: property reason
+      result: CARRIED, each with its own reason (G5)
+
+# ---------------------------------------------------------------- lifecycle
+
+# Planned (G4). Each open record (a bank line or a firm movement the rules did
+# not match) carries a temporal property `state`, set at the moment each step
+# happens, so a view before any date shows its state on that date.
+lifecycle:
+  property: state
+  status: planned
+  step: G4
+  states:
+    OPEN: no rule matched it in this run
+    PROPOSED: an explanation waits for a person
+    EXPLAINED: a person approved an explanation
+    ESCALATED: Claude could not explain it (NON LIQUET); a person must look
+    CARRIED: carried into the next month at closing, with a reason
+    CLEARED: a later month's bank line cleared it (R0)
+  why_not_persistent_graph: >
+    Raphtory's PersistentGraph can end an edge (an item "open until cleared"),
+    but in 0.17 it has no to_parquet, and the run snapshots rely on Parquet
+    (save_to_file drops Decimals). A temporal property gives the same answer
+    through views, and was tested on 0.17.
+
+# ---------------------------------------------------------------- nodes
 
 nodes:
 
-  # ---------------- firm side ----------------
+  # ---------------- facts: firm side ----------------
 
   Client:
+    group: facts
+    status: built
+    prov: Entity
     collection: clients
     key: client_id
     description: A person or trust whose money the firm manages.
@@ -58,6 +189,9 @@ nodes:
         several places; the first copy's place is kept.
 
   Portfolio:
+    group: facts
+    status: built
+    prov: Entity
     collection: portfolios
     key: portfolio_id
     description: >
@@ -65,64 +199,67 @@ nodes:
       custody account shared with other portfolios.
     fields:
       portfolio_id: Stable portfolio identifier, e.g. PF-CL-003.
-      client_id: The client who owns the portfolio.
-      account_id: The custody account the portfolio's cash is held in.
       source: Where in the firm's data this record came from.
 
   Account:
+    group: facts
+    status: built
+    prov: Entity
     collection: accounts
     key: account_id
     description: >
-      The pooled client cash account at the custodian. The bank sees only
-      this account, not the portfolios behind it.
+      The pooled client cash account at the custodian. The bank sees only this
+      account, not the portfolios behind it.
     fields:
       account_id: Stable account identifier, e.g. ACC-KRW-CASH-01.
-      account_name: Account name.
+      name: Account name.
       custodian: The bank holding the account.
       currency: Account currency (GBP in v1).
       source: Where in the firm's data this record came from.
 
   AccountBalance:
+    group: facts
+    status: built
+    prov: Entity
     collection: account_balances
-    key: [account_id, as_of]
+    key: "<account_id>:balance:<as_of>"
     description: >
-      The balance of an account that the firm recorded for one date. It is the
-      starting point for the firm's side: the opening balance for a period is
-      the balance as of the day before it starts. Balances for other dates are
-      calculated (the latest recorded balance plus the movements since), not
-      stored. A new record is added when the firm records a balance; old ones
-      are kept, so past opening balances can still be asked for.
+      The balance the firm recorded for its account on one date. The opening
+      balance for a period is the one as of the day before it starts.
     fields:
-      account_id: Account the balance is for.
-      as_of: >
-        The date the balance applies to (end of that day). The firm's data has
-        no separate "recorded on" date for balances in v1.
+      as_of: The date the balance applies to (end of that day).
       balance: The firm's recorded balance. May be negative if overdrawn.
       source: Where in the firm's data this record came from.
 
   CashMovement:
+    group: facts
+    status: built
+    prov: Entity
     collection: cash_book
     key: entry_id
     description: >
-      One cash movement the firm recorded. Client movements belong to a
-      portfolio; account movements (custody fee, interest) belong to no client.
+      One cash movement the firm recorded (a cash entry). Client movements
+      belong to a portfolio; account movements (custody fee, interest) belong
+      to no client.
     fields:
       entry_id: Stable identifier, e.g. CE-2026-06-0007.
-      portfolio_id: Portfolio holding the movement; null for account movements.
-      account_id: Account the movement is on.
       date: When the movement happened (for trades, the trade date).
-      recorded_at: When the firm recorded it. Lets us ask what was known, and when.
+      recorded_at: When the firm recorded it.
+      expected_date: When the bank should show it (for trades, the settlement date).
       entry_type: >
         SUBSCRIPTION, WITHDRAWAL, TRADE_SETTLEMENT, DIVIDEND, MANAGEMENT_FEE,
         CUSTODY_FEE or INTEREST.
       description: The firm's narrative.
-      reference: The firm's reference, e.g. CL-003-SUB-0618 or TR-26062901.
-      trade_id: Trade settled by this movement, if any.
-      ticker: Security paying the dividend, if any.
-      amount: Signed amount (derived from debit/credit).
+      reference: The firm's reference, e.g. CL-003-SUB-0618; empty if none.
+      amount: Signed amount.
       source: Where in the firm's data this record came from.
+      known_at: planned (G3) — run_at of the first run that received it.
+      state: planned (G4) — see lifecycle.
 
   Trade:
+    group: facts
+    status: built
+    prov: Entity
     collection: trades
     key: trade_id
     description: >
@@ -130,9 +267,6 @@ nodes:
       settlement date.
     fields:
       trade_id: Firm trade reference, e.g. TR-26062901.
-      portfolio_id: Portfolio the trade was made for.
-      account_id: Account the trade settles through.
-      ticker: Security traded.
       side: BUY (cash goes out) or SELL (cash comes in).
       trade_date: When the trade was agreed.
       settlement_date: When the cash moves (T+2).
@@ -143,6 +277,9 @@ nodes:
       source: Where in the firm's data this record came from.
 
   Security:
+    group: facts
+    status: built
+    prov: Entity
     collection: securities
     key: ticker
     description: A financial instrument the firm trades or receives dividends from.
@@ -155,277 +292,482 @@ nodes:
         Where in the firm's data this record came from. The firm copies it into
         several places; the first copy's place is kept.
 
-  # ---------------- bank side ----------------
+  # ---------------- facts: bank side ----------------
 
   BankStatement:
-    collection: bank_statements
+    group: facts
+    status: built
+    prov: Entity
     key: statement_id
-    description: The custodian's statement of one account for one period.
+    description: >
+      The custodian's statement of one account for one month. It is the month's
+      anchor: findings point to it, and later a run reconciles it.
     fields:
-      statement_id: Stable statement identifier.
-      account_id: Account the statement is for.
-      custodian: Bank that issued it.
-      currency: Statement currency.
       period_start: First day covered.
       period_end: Last day covered.
       opening_balance: Balance at the start of the period.
       closing_balance: Balance at the end of the period.
-      source: The file the statement was read from.
 
   BankEntry:
-    collection: bank_entries
+    group: facts
+    status: built
+    prov: Entity
     key: line_id
     description: >
-      One line of the bank statement: what the bank says happened. The bank
-      knows the account, not the client or the trade behind a line.
+      One line of the bank statement (a bank line): what the bank says
+      happened. The bank knows the account, not the client or trade behind it.
     fields:
-      line_id: Stable identifier for the line.
-      statement_id: Statement containing the line.
       date: Date the bank booked it.
+      line_number: Line number in the received file.
+      amount: Signed amount.
+      entry_type: The type read from the bank's text, if any.
+      reference: The bank's reference; empty if none.
       description: The bank's text, often abbreviated, e.g. PN TOPUP.
-      reference: The bank's reference, often empty.
-      amount: Signed amount (derived from paid_in/paid_out).
-      balance: Running balance after this line.
-      line_number: Line number in the source file.
+      known_at: planned (G3) — run_at of the run that received it.
+      state: planned (G4) — see lifecycle.
 
-# Records created by Liquet itself, never read from the firm's database or the
-# bank's files. Stored in Liquet's own results store.
-result_nodes:
+  # ---------------- judgements ----------------
+
+  Run:
+    group: judgements
+    status: planned
+    step: G3
+    prov: Activity
+    key: run_id
+    description: >
+      One reconciliation of one month: Liquet read the files, applied the rules
+      and saved the results. Today the run is only a run_id text on other parts;
+      G3 makes it a node, so matches and findings can point to the run that
+      made them, and the run to the code release that ran.
+    fields:
+      run_id: e.g. ACC-KRW-CASH-01_2026-06/run-001.
+      run_at: When it ran.
+      stages: The stages it went through, in order.
+      release: Liquet version, git commit, uncommitted changes (from run.json).
+      counts: Decisions, findings and leftovers.
+      final: true once a Closing marks it final (G5).
 
   Finding:
-    collection: findings
-    key: finding_id
+    group: judgements
+    status: built
+    prov: Entity
+    key: "<run_id>:<finding_id>"
     description: >
-      One explained difference, or one unmatched item with a proposed
-      explanation. A finding is a node, not an edge, because it has a life of
-      its own (a status, an approval, a journal) and can concern several
-      records at once, for example five fee entries and one bank line.
+      One explained difference, or one open item with a proposed explanation,
+      from a rule (R2a, R5), the agent, or a person. A node, not an edge, because
+      it has a life of its own (a status, a review) and can concern several
+      records at once.
     fields:
-      finding_id: >
-        Stable identifier: who proposed it and the entry it is about, e.g.
-        R5:CE-2026-06-0011. The same input always gives the same id. In the
-        graph the node name adds the run id in front
-        (ACC-KRW-CASH-01_2026-06/run-001:R5:CE-2026-06-0011), so a re-run's
-        findings never merge with an earlier run's.
-      rule: The rule that proposed it (R2a, R5), or "agent".
+      finding_id: e.g. R5:CE-2026-06-0011 for a rule's, P1 for a proposal.
+      rule: The rule that proposed it (rule findings only).
       category: IN_TRANSITU, OMISSUM or ERRATUM.
       type: >
         DEPOSIT_IN_TRANSIT, OUTSTANDING_PAYMENT, OUTSTANDING_RECEIPT,
-        WITHHOLDING_TAX, BANK_FEE, INTEREST or BOOK_ERROR. Open list; new types
-        are added as cases appear.
-      firm_ids: The firm movements it concerns (may be empty).
-      bank_ids: The bank lines it concerns (may be empty).
-      adjusts: bank or book. Which side of the reconciliation it adjusts.
+        WITHHOLDING_TAX, BANK_FEE, INTEREST or BOOK_ERROR.
+      adjusts: book or bank.
       adjustment: Signed amount added to that side's closing balance.
-      explanation: Plain-language reason, as it will appear in the month-end report.
-      evidence: Records and facts supporting it.
-      status: PROPOSED, APPROVED or REJECTED. Only a person approves.
-      proposed_by: The rule id, or "agent", that proposed it.
-      decided_by: The person who approved or rejected it; null while proposed.
-      proposed_at: When it was proposed (for rules, the run's run_at).
-      decided_at: >
-        When a person approved or rejected it; null while proposed.
-        Planned: written by the review log, not built yet.
-      # The month a finding belongs to is not a field: it is the FINDING_FOR
-      # edge to its BankStatement, and the run's run.json.
+      explanation: Plain-language reason, as in the month-end report.
+      evidence: Records and facts supporting it (JSON text).
+      status: >
+        Temporal: PROPOSED when made; APPROVED or REJECTED from the moment a
+        person decides.
+      proposed_by: The rule id, or the agent's or person's name.
+      proposer: agent or person (proposals only).
+      model: The Claude model (agent proposals only).
+      decided_by: The person who decided, from the moment they did.
+      run_id: The run it belongs to (text today; IN_RUN edge planned, G3).
+
+  Review:
+    group: judgements
+    status: built
+    built_as: Decision      # renamed Review in G3: "decision" also names a rule's match in decisions.json
+    prov: Activity
+    key: "<run_id>:D<n>"
+    description: A person approving or rejecting one finding, with a reason.
+    fields:
+      kind: APPROVED or REJECTED.
+      reason_code: >
+        CONFIRMED, WRONG_AMOUNT, WRONG_PERIOD, WRONG_PARTY, NEEDS_EVIDENCE or
+        OTHER.
+      reason: In words; needed to reject.
+      run_id: The run it belongs to.
+
+  Closing:
+    group: judgements
+    status: planned
+    step: G5
+    prov: Activity
+    key: "<run_id>:closing"
+    description: >
+      A person marking one run final for its month, and carrying what is still
+      open into the next month, each item with a reason (closing.json).
+    fields:
+      closed_at: When.
+      reason: Why this run is final.
+      release: The code that wrote closing.json.
+
+  # ---------------- reasoning ----------------
+
+  Investigation:
+    group: reasoning
+    status: built
+    prov: Activity
+    key: "<run_id>:I<n>"
+    description: One call to Claude about one open item, at the moment it was made.
+    fields:
+      item_id: The open item it was about.
+      model: The model asked.
+      question: The facts pack sent, word for word.
+      answer: PROPOSAL or NON_LIQUET.
+      explanation: Claude's explanation.
+      outcome: Saved as a proposal, refused by the checks, or NON_LIQUET.
+      input_tokens: Tokens sent.
+      output_tokens: Tokens received.
+      stop_reason: Why the answer ended.
+      source: claude, or replay:<file> when an earlier answer was replayed.
+      run_id: The run it belongs to.
+
+  # ---------------- actors ----------------
+
+  Actor:
+    group: actors
+    status: built
+    prov: Agent
+    key: "<kind>:<name>"
+    description: >
+      Whoever made a judgement. One node per actor: person:sonja,
+      agent:quaestor, rule:R5. PROV-O would call a rule a Plan that software
+      follows, not an Agent; Liquet keeps rules as actors because "decided by a
+      rule" is what a reader needs to see.
+    fields:
+      kind: person, agent or rule; software planned (G3), for the Run.
+      name: The person's name, the agent's name, or the rule id.
+
+# ---------------------------------------------------------------- edges
 
 edges:
 
-  # Facts that follow directly from canonical fields. Built when the graph is built.
-  structural:
+  # ---------------- facts ----------------
 
-    OWNS_PORTFOLIO:
-      from: Client
-      to: Portfolio
-      build: {rule: field_equality, from_field: client_id, to_field: client_id}
-      time: null
-      is_event: false
-      cardinality: {from: "1..*", to: "1"}
-      meaning: The client owns this portfolio.
+  OWNS_PORTFOLIO:
+    group: facts
+    status: built
+    from: Client
+    to: Portfolio
+    time: static (day before the period)
+    cardinality: {from: "1..*", to: "1"}
+    meaning: The client owns this portfolio.
 
-    USES_ACCOUNT:
-      from: Portfolio
-      to: Account
-      build: {rule: field_equality, from_field: account_id, to_field: account_id}
-      time: null
-      is_event: false
-      cardinality: {from: "1", to: "0..*"}
-      meaning: The portfolio's cash is held in this pooled account.
+  USES_ACCOUNT:
+    group: facts
+    status: built
+    from: Portfolio
+    to: Account
+    time: static (day before the period)
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The portfolio's cash is held in this pooled account.
 
-    HAS_BALANCE:
-      from: Account
-      to: AccountBalance
-      build: {rule: field_equality, from_field: account_id, to_field: account_id}
-      time: {node: to, field: as_of}
-      is_event: false
-      cardinality: {from: "0..*", to: "1"}
-      meaning: >
-        The firm recorded this balance for the account on this date. An
-        account has one per recorded date, so its history is kept.
+  HAS_BALANCE:
+    group: facts
+    status: built
+    from: Account
+    to: AccountBalance
+    time: the balance's as_of
+    cardinality: {from: "0..*", to: "1"}
+    meaning: The firm recorded this balance for the account on this date.
 
-    HAS_MOVEMENT:
-      from: Portfolio
-      to: CashMovement
-      build: {rule: field_equality, from_field: portfolio_id, to_field: portfolio_id}
-      time: {node: to, field: date}
-      is_event: false
-      cardinality: {from: "0..*", to: "0..1"}
-      meaning: >
-        The movement belongs to this portfolio. Account movements (custody fee,
-        interest) have no portfolio.
+  HAS_MOVEMENT:
+    group: facts
+    status: built
+    from: Portfolio
+    to: CashMovement
+    time: the movement's date
+    cardinality: {from: "0..*", to: "0..1"}
+    meaning: The movement belongs to this portfolio. Account movements have none.
 
-    ON_ACCOUNT:
-      from: CashMovement
-      to: Account
-      build: {rule: field_equality, from_field: account_id, to_field: account_id}
-      time: {node: from, field: date}
-      is_event: false
-      cardinality: {from: "1", to: "0..*"}
-      meaning: The movement is on this account. Every movement has exactly one.
+  ON_ACCOUNT:
+    group: facts
+    status: built
+    from: CashMovement
+    to: Account
+    time: the movement's date
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The movement is on this account.
 
-    HAS_TRADE:
-      from: Portfolio
-      to: Trade
-      build: {rule: field_equality, from_field: portfolio_id, to_field: portfolio_id}
-      time: {node: to, field: trade_date}
-      is_event: false
-      cardinality: {from: "0..*", to: "1"}
-      meaning: The trade was made for this portfolio.
+  HAS_TRADE:
+    group: facts
+    status: built
+    from: Portfolio
+    to: Trade
+    time: the trade date
+    cardinality: {from: "0..*", to: "1"}
+    meaning: The trade was made for this portfolio.
 
-    IN_SECURITY:
-      from: Trade
-      to: Security
-      build: {rule: field_equality, from_field: ticker, to_field: ticker}
-      time: {node: from, field: trade_date}
-      is_event: false
-      cardinality: {from: "1", to: "0..*"}
-      meaning: The trade is in this security.
+  IN_SECURITY:
+    group: facts
+    status: built
+    from: Trade
+    to: Security
+    time: the trade date
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The trade is in this security.
 
-    SETTLED_BY:
-      from: Trade
-      to: CashMovement
-      build:
-        rule: field_equality
-        from_field: trade_id
-        to_field: trade_id
-        when: {node: to, field: entry_type, equals: TRADE_SETTLEMENT}
-      time: {node: from, field: settlement_date}
-      is_event: true
-      cardinality: {from: "0..1", to: "0..1"}
-      meaning: >
-        The cash movement is the settlement of this trade. Dated by the
-        settlement date, not the trade date: a trade agreed in one month can
-        settle in the next, which is a timing difference (IN TRANSITU).
+  SETTLED_BY:
+    group: facts
+    status: built
+    from: Trade
+    to: CashMovement
+    time: the trade's settlement date
+    cardinality: {from: "0..1", to: "0..1"}
+    meaning: >
+      The movement is the settlement of this trade. Dated by the settlement
+      date: a trade agreed in one month can settle in the next (IN TRANSITU).
 
-    DIVIDEND_ON:
-      from: CashMovement
-      to: Security
-      build:
-        rule: field_equality
-        from_field: ticker
-        to_field: ticker
-        when: {node: from, field: entry_type, equals: DIVIDEND}
-      time: {node: from, field: date}
-      is_event: true
-      cardinality: {from: "0..1", to: "0..*"}
-      meaning: The movement is a dividend paid by this security.
+  DIVIDEND_ON:
+    group: facts
+    status: built
+    from: CashMovement
+    to: Security
+    time: the movement's date
+    cardinality: {from: "0..1", to: "0..*"}
+    meaning: The movement is a dividend paid by this security.
 
-    FOR_ACCOUNT:
-      from: BankStatement
-      to: Account
-      build: {rule: field_equality, from_field: account_id, to_field: account_id}
-      time: {node: from, field: period_end}
-      is_event: false
-      cardinality: {from: "1", to: "0..*"}
-      meaning: The statement is for this account.
+  FOR_ACCOUNT:
+    group: facts
+    status: built
+    from: BankStatement
+    to: Account
+    time: the statement's period_end
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The statement is for this account.
 
-    CONTAINS:
-      from: BankStatement
-      to: BankEntry
-      build: {rule: field_equality, from_field: statement_id, to_field: statement_id}
-      time: {node: to, field: date}
-      is_event: false
-      cardinality: {from: "0..*", to: "1"}
-      meaning: The statement contains this line.
+  CONTAINS:
+    group: facts
+    status: built
+    from: BankStatement
+    to: BankEntry
+    time: the line's date
+    cardinality: {from: "0..*", to: "1"}
+    meaning: The statement contains this line.
 
-  # Conclusions created by Liquet's matching engine (and the agent), not built
-  # from source data. Stored in Liquet's own results, never in the firm's database.
-  reconciliation:
+  # ---------------- judgements ----------------
 
-    MATCHED_TO:
-      from: BankEntry
-      to: CashMovement
-      created_by: matching
-      attributes:
-        verdict: >
-          CONGRUIT (same transaction), DISCREPAT (evidence they are not the
-          same) or NON LIQUET (a candidate, but not enough evidence).
-        rule: The matching rule (or "agent") that produced the verdict.
-        differences: >
-          List of the ways the two records disagree. Each item has field
-          (amount, date or reference), bank_value, firm_value and, for amounts,
-          difference (bank minus firm). Empty when everything agrees. A
-          difference does not make the verdict DISCREPAT: the pair can be the
-          same transaction and still disagree.
-        evidence: Records and facts supporting the verdict.
-        run_id: The run that produced it, e.g. ACC-KRW-CASH-01_2026-06/run-001.
-      # Rules decide when the run happens, so the edge's time is the run's
-      # run_at (from run.json), not a field of the decision itself.
-      time: {node: run, field: run_at}
-      is_event: false
-      cardinality: {from: "0..*", to: "0..*"}
-      constraints:
-        - Each CashMovement has at most one CONGRUIT edge.
-        - DISCREPAT and NON LIQUET edges record candidates that were considered, so the reasoning is kept.
-        - An item with no candidate at all gets no MATCHED_TO edge; it gets a Finding.
-      meaning: >
-        Liquet's conclusion about whether a bank line and a firm movement are
-        the same transaction, and how they differ. One bank line may match
-        several movements, for example one fee transfer covering several
-        clients' management fees.
+  MATCHED_TO:
+    group: judgements
+    status: built
+    prov: a rule's conclusion; the Run it belongs to is its Activity (G3)
+    from: BankEntry
+    to: CashMovement
+    time: run_at
+    cardinality: {from: "0..*", to: "0..*"}
+    properties:
+      verdict: >
+        CONGRUIT (same transaction), DISCREPAT (evidence they are not) or
+        NON LIQUET (a candidate, not enough evidence; R4 when two fit).
+      rule: The rule that produced it (R0-R5).
+      differences: How the two disagree (JSON text); empty when they agree.
+      evidence: What the rule relied on (JSON text).
+      run_id: The run that produced it.
+    meaning: >
+      A rule's conclusion about whether a bank line and a firm movement are the
+      same transaction. Stays an edge, not a node: a rule's match can be
+      reproduced exactly from the code, and the Run records which release ran
+      (G3). Reconsider only if a person may ever overturn a match.
 
-    EXPLAINS_MOVEMENT:
-      from: Finding
-      to: CashMovement
-      created_by: matching
-      time: {node: from, field: proposed_at}
-      is_event: false
-      cardinality: {from: "0..*", to: "0..*"}
-      meaning: The finding concerns this firm movement (timing difference, error, ...).
+  FINDING_FOR:
+    group: judgements
+    status: built
+    from: Finding
+    to: BankStatement
+    time: the finding's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The finding was raised in this statement's month, and stays linked to it.
 
-    EXPLAINS_LINE:
-      from: Finding
-      to: BankEntry
-      created_by: matching
-      time: {node: from, field: proposed_at}
-      is_event: false
-      cardinality: {from: "0..*", to: "0..*"}
-      meaning: >
-        The finding concerns this bank line (for example a fee the firm has
-        not recorded). A finding may concern movements, lines, or both.
+  EXPLAINS_LINE:
+    group: judgements
+    status: built
+    prov: wasDerivedFrom (the finding is about this line)
+    from: Finding
+    to: BankEntry
+    time: the finding's moment
+    cardinality: {from: "0..*", to: "0..*"}
+    meaning: The finding concerns this bank line.
 
-    FINDING_FOR:
-      from: Finding
-      to: BankStatement
-      created_by: matching
-      time: {node: from, field: proposed_at}
-      is_event: false
-      cardinality: {from: "1", to: "0..*"}
-      meaning: >
-        The finding was raised in this statement's reconciliation (its month).
-        It stays linked to that month even while it is carried forward.
+  EXPLAINS_MOVEMENT:
+    group: judgements
+    status: built
+    prov: wasDerivedFrom (the finding is about this movement)
+    from: Finding
+    to: CashMovement
+    time: the finding's moment
+    cardinality: {from: "0..*", to: "0..*"}
+    meaning: The finding concerns this firm movement.
 
-    CLEARED_BY:
-      from: Finding
-      to: BankEntry
-      created_by: matching
-      time: {node: to, field: date}
-      is_event: false
-      cardinality: {from: "0..*", to: "0..1"}
-      planned: true   # needs a second month of data (a July fixture) to build and test
-      meaning: >
-        A timing difference from an earlier month has cleared: this bank line,
-        on a later statement, is the payment or receipt the finding was waiting
-        for. Each run starts by loading the findings still open from earlier
-        months and looking for their lines first. A finding with no CLEARED_BY
-        edge is still open, and gets older every month until a person acts.
+  DECIDES:
+    group: judgements
+    status: built
+    prov: used
+    from: Review
+    to: Finding
+    time: the review's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The review approves or rejects this finding.
+
+  IN_RUN:
+    group: judgements
+    status: planned
+    step: G3
+    prov: wasGeneratedBy
+    from: Finding
+    to: Run
+    time: the finding's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The finding belongs to this run (replaces the run_id text as the link).
+
+  RECONCILES:
+    group: judgements
+    status: planned
+    step: G3
+    prov: used
+    from: Run
+    to: BankStatement
+    time: run_at
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The run reconciled this statement's month.
+
+  CLOSES:
+    group: judgements
+    status: planned
+    step: G5
+    prov: used
+    from: Closing
+    to: Run
+    time: closed_at
+    cardinality: {from: "1", to: "0..1"}
+    meaning: The closing marks this run final for its month.
+
+  CARRIED:
+    group: judgements
+    status: planned
+    step: G5
+    prov: wasDerivedFrom (next month's open item comes from this one)
+    from: Closing
+    to: [BankEntry, CashMovement]
+    time: closed_at
+    cardinality: {from: "0..*", to: "0..1"}
+    properties:
+      status: EXPECTED (approved as in transit) or UNEXPLAINED.
+      reason: Why it is carried.
+    meaning: The closing carried this open item into the next month.
+
+  CLEARED_BY:
+    group: judgements
+    status: planned
+    step: G5
+    prov: wasInvalidatedBy (the open item stops being open)
+    from: [BankEntry, CashMovement]
+    to: BankEntry
+    time: the clearing line's date
+    cardinality: {from: "0..1", to: "0..1"}
+    properties:
+      rule: R0.
+      lag_days: Days between the expected date and the line.
+      late: true if later than the date tolerance.
+      run_id: The later month's run.
+    meaning: >
+      A carried item has cleared: this bank line, on a later statement, is the
+      payment or receipt it was waiting for.
+
+  # ---------------- reasoning ----------------
+
+  INVESTIGATED:
+    group: reasoning
+    status: built
+    prov: used
+    from: Investigation
+    to: [BankEntry, CashMovement]
+    time: the investigation's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The open item the call was about (either side).
+
+  EXAMINED:
+    group: reasoning
+    status: built
+    prov: used
+    from: Investigation
+    to: [BankEntry, CashMovement]
+    time: the investigation's moment
+    cardinality: {from: "0..*", to: "0..*"}
+    meaning: >
+      A record whose facts Claude was shown: evidence about this item, e.g. the
+      other side's same-amount records.
+
+  PRODUCED:
+    group: reasoning
+    status: built
+    prov: wasGeneratedBy (read the other way)
+    from: Investigation
+    to: Finding
+    time: the investigation's moment
+    cardinality: {from: "0..1", to: "0..1"}
+    meaning: The call led to this proposal, after the checks passed.
+
+  ESCALATED_TO:
+    group: reasoning
+    status: planned
+    step: G4
+    from: Investigation
+    to: Actor
+    time: the investigation's moment
+    cardinality: {from: "0..1", to: "0..*"}
+    properties:
+      reason: NON_LIQUET, or the checks refused the proposal.
+    meaning: >
+      Claude could not explain the item, so it goes to a person (later, to the
+      tier-2 agent). Today this is only the absence of PRODUCED.
+
+  CONSULTED:
+    group: reasoning
+    status: planned
+    step: G6
+    from: Investigation
+    to: [Finding, Review]
+    time: the investigation's moment
+    cardinality: {from: "0..*", to: "0..*"}
+    meaning: >
+      A past judgement about a different, look-alike item that the agent looked
+      at. A hint for its questions, never evidence for its answer.
+
+  # ---------------- actors ----------------
+
+  PROPOSED_BY:
+    group: actors
+    status: built
+    prov: wasAttributedTo
+    from: Finding
+    to: Actor
+    time: the finding's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The rule, agent or person who proposed the finding.
+
+  MADE_BY:
+    group: actors
+    status: built
+    prov: wasAssociatedWith
+    from: [Review, Closing]
+    to: Actor
+    time: the review's or closing's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: The person who decided.
+
+  RUN_BY:
+    group: actors
+    status: built
+    prov: wasAssociatedWith
+    from: [Investigation, Run]
+    to: Actor
+    time: the activity's moment
+    cardinality: {from: "1", to: "0..*"}
+    meaning: >
+      The agent that ran the investigation; for a Run (G3), the software actor
+      for the Liquet release that ran it.
