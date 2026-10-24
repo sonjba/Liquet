@@ -15,6 +15,9 @@ dependencies = [
     "python-dotenv==1.2.4",
 ]
 
+[project.scripts]
+liquet = "liquet.cli:main"      # pip install creates the `liquet` command
+
 [project.optional-dependencies]
 dev = ["pytest==9.1.1"]
 

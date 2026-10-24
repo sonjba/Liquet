@@ -4,8 +4,9 @@ Each folder under src/liquet/ is a part. A part may import from itself and from 
 parts listed for it in ALLOWED, nothing else. The rules are about folders, not file
 names, so they keep working when a file is renamed or a new file is added.
 
-Files directly in src/liquet/ (config.py) are shared: every part may use them,
-and they may use no part.
+Files directly in src/liquet/ (config.py, release.py) are shared: every part may
+use them, and they may use no part. The entry points (cli.py, __main__.py) are the
+opposite: they may reach every part, and nothing may import them.
 
 Two rules matter most:
 - the door: only the pipeline reads outside formats. Everything after it sees
@@ -20,6 +21,7 @@ from pathlib import Path
 import pytest
 
 LIQUET = Path(__file__).parent.parent / "src" / "liquet"
+ENTRY_POINTS = {"cli", "__main__"}   # where a command starts; they call the parts
 
 ALLOWED = {
     "door":       set(),                                     # outside formats in, nothing else
@@ -34,8 +36,8 @@ ALLOWED = {
 
 
 def shared():
-    """The modules directly in src/liquet/, which every part may use: config."""
-    return {f.stem for f in LIQUET.glob("*.py") if f.stem != "__init__"}
+    """The modules directly in src/liquet/, which every part may use: config, release."""
+    return {f.stem for f in LIQUET.glob("*.py") if f.stem != "__init__"} - ENTRY_POINTS
 
 
 def parts():
@@ -77,6 +79,13 @@ def test_a_part_imports_only_what_it_may(part):
 @pytest.mark.parametrize("module", sorted(shared()))
 def test_a_shared_module_uses_no_part(module):
     assert liquet_imports((LIQUET / f"{module}.py").read_text(encoding="utf-8")) == set()
+
+
+def test_nothing_imports_an_entry_point():
+    importers = {str(file.relative_to(LIQUET)) for file in LIQUET.rglob("*.py")
+                 if file.stem not in ENTRY_POINTS
+                 and liquet_imports(file.read_text(encoding="utf-8")) & ENTRY_POINTS}
+    assert importers == set()
 
 
 def test_only_the_pipeline_may_use_the_door():
