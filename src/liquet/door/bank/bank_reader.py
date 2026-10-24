@@ -234,19 +234,3 @@ def check_continuity(headers: list[dict]) -> list[str]:
     return problems
 
 
-if __name__ == "__main__":
-    header = read_header(Path("tests/fixtures/2026-06/statement_header.json"))
-    lines = read_lines(Path("tests/fixtures/2026-06/bank_statement.csv"))
-
-    totals_ok, totals_message = check_totals(header, lines)
-    running_ok, running_message = check_running_balance(header, lines)
-    dates_ok, dates_message = check_dates(header, lines)
-
-    print("PASS" if totals_ok else "FAIL", "totals:", totals_message)
-    print("PASS" if running_ok else "FAIL", "running balance:", running_message)
-    print("PASS" if dates_ok else "FAIL", "dates:", dates_message)
-
-    if totals_ok and running_ok and dates_ok:
-        print("Statement checks passed")
-    else:
-        print("Statement checks FAILED: do not reconcile this statement")

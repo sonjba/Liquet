@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 from decimal import Decimal
@@ -42,11 +43,20 @@ def score(run, answer_key):
     return results
 
 
-if __name__ == "__main__":
-    answer_key = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-    results = score(Path(sys.argv[1]), answer_key)
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Score a run against an answer key.")
+    parser.add_argument("run_folder", type=Path)
+    parser.add_argument("answer_key", type=Path, help="e.g. tests/fixtures/2026-06/answer_key.json")
+    args = parser.parse_args(argv)
+    answer_key = json.loads(args.answer_key.read_text(encoding="utf-8"))
+    results = score(args.run_folder, answer_key)
     for r in results:
         print(f"  {r['break']}  {r['verdict']:<6} {r['by'] or ''}")
     for verdict in ("RIGHT", "WRONG", "OPEN"):
         print(f"{verdict}: {sum(r['verdict'] == verdict for r in results)}", end="   ")
     print()
+
+
+if __name__ == "__main__":
+    sys.exit(cli())

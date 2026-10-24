@@ -6,7 +6,7 @@ It only reads the run folder. It never changes anything.
 """
 
 from __future__ import annotations
-
+import argparse
 import sys
 from pathlib import Path
 
@@ -32,5 +32,12 @@ def load_month(run_folder: Path) -> dict:
     }
 
 
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Read a saved run back.")
+    parser.add_argument("run_folder", type=Path)
+    show(load_month(parser.parse_args(argv).run_folder))
+
+
 if __name__ == "__main__":
-    show(load_month(Path(sys.argv[1])))
+    sys.exit(cli())

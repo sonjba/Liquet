@@ -175,12 +175,3 @@ class JsonFirmConnector:
                    and start <= date.fromisoformat(entry["date"]) <= end]
         return sorted(entries, key=lambda entry: (entry["date"], entry["entry_id"]))
 
-
-if __name__ == "__main__":
-    june = Path("tests/fixtures/2026-06/firm")
-    canonical = map_firm_records_to_canonical(load_json(june / "accounts.json"),
-                             load_json(june / "portfolios.json"))
-    for collection, records in canonical.items():
-        print(f"{collection}: {len(records)}")
-    # expect: accounts 1, account_balances 1, clients 5, portfolios 5,
-    #         securities 4, trades 5, cash_book 17

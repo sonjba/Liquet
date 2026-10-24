@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 from decimal import Decimal
@@ -93,6 +94,15 @@ def facts_for(run_folder, item_id):
     return facts
 
 
-if __name__ == "__main__":
-    facts = facts_for(Path(sys.argv[1]), sys.argv[2])
+def cli(argv=None, prog=None):
+    """The command line: `liquet ...` and `python -m ...` both come here."""
+    parser = argparse.ArgumentParser(prog=prog, description="Show the facts Claude gets for one open item.")
+    parser.add_argument("run_folder", type=Path)
+    parser.add_argument("item_id")
+    args = parser.parse_args(argv)
+    facts = facts_for(args.run_folder, args.item_id)
     print(json.dumps(facts, indent=2))
+
+
+if __name__ == "__main__":
+    sys.exit(cli())
